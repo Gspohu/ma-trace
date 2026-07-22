@@ -1,0 +1,134 @@
+/* ── Minimal Reset + Baseline ─────────────────────────────────────────
+   Sensible defaults. Import BEFORE tokens.css
+   ──────────────────────────────────────────────────────────────────── */
+
+*,
+*::before,
+*::after
+{
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html
+{
+    height: 100%;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+}  
+
+
+body
+{
+    height: 100%;
+    min-height: 100vh;
+    min-height: 100dvh;
+    font-family: var(--font-sans);
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-regular);
+    line-height: var(--line-height-normal);
+    color: var(--colour-text-primary);
+    background-color: var(--colour-bg-primary);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+img,
+svg,
+video,
+canvas
+{
+    display: block;
+    max-width: 100%;
+}
+
+
+input,
+button,
+textarea,
+select
+{
+    font: inherit;
+    color: inherit;
+}
+
+
+button
+{
+    cursor: pointer;
+}
+
+a
+{
+    color: var(--colour-accent);
+    text-decoration: none;
+}
+
+
+a:hover
+{
+    text-decoration: underline;
+} 
+
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible
+{
+    outline: var(--border-width-thick) solid var(--colour-border-focus);
+    outline-offset: 2px;
+}
+
+
+::selection
+{
+    background: var(--colour-selection);
+}
+
+
+code,
+pre,
+kbd
+{
+    font-family: var(--font-mono);
+}
+
+pre
+{
+    overflow-x: auto;
+}
+
+
+h1, h2, h3, h4, h5, h6
+{
+    line-height: var(--line-height-tight);
+    font-weight: var(--font-weight-semibold);
+}
+
+
+ul, ol
+{
+    list-style: none;
+}
+
+table
+{
+    border-collapse: collapse;
+}
+
+
+/* Respect reduced motno */
+@media (prefers-reduced-motion: reduce)
+{
+    *,
+    *::before,
+    *::after
+    {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}

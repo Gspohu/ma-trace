@@ -1,0 +1,30 @@
+{
+  "hanau-grande": {
+    "label": "Etang de Hanau, grande boucle (Falkenstein, Rothenbourg, Waldeck)",
+    "waypoints": [
+      { "name": "Etang de Hanau", "lat": 49.00844, "lon": 7.53520 },
+      { "name": "Etang de Lieschbach", "lat": 49.00763, "lon": 7.55679 },
+      { "name": "Chateau du Falkenstein", "lat": 49.00491, "lon": 7.56537 },
+      { "name": "Chateau de Rothenbourg", "lat": 49.02455, "lon": 7.57554 },
+      { "name": "Erbsenberg", "lat": 49.02781, "lon": 7.55947 },
+      { "name": "Chateau de Waldeck", "lat": 49.01740, "lon": 7.52656 }
+    ]
+  },
+  "hanau-courte": {
+    "label": "Etang de Hanau, boucle courte (Falkenstein, Waldeck)",
+    "waypoints": [
+      { "name": "Etang de Hanau", "lat": 49.00844, "lon": 7.53520 },
+      { "name": "Etang de Lieschbach", "lat": 49.00763, "lon": 7.55679 },
+      { "name": "Chateau du Falkenstein", "lat": 49.00491, "lon": 7.56537 },
+      { "name": "Chateau de Waldeck", "lat": 49.01740, "lon": 7.52656 }
+    ]
+  },
+  "champ-du-feu": {
+    "label": "Le Hohwald, Champ du Feu, Neuntelstein",
+    "waypoints": [
+      { "name": "Le Hohwald", "lat": 48.40372, "lon": 7.31459 },
+      { "name": "Champ du Feu", "lat": 48.40122, "lon": 7.25397 },
+      { "name": "Rocher de Neuntelstein", "lat": 48.42869, "lon": 7.29218 }
+    ]
+  }
+}

@@ -1,0 +1,25 @@
+/* Application shell. Everything visual comes from the desgin system tokens */
+
+body
+{
+    min-height: 100vh;
+    background: var(--colour-bg-primary);
+    color: var(--colour-text-primary);
+    font-family: var(--font-sans); 
+    font-size: var(--font-size-base);
+    line-height: var(--line-height-normal);
+    -webkit-font-smoothing: antialiased;  
+}
+
+
+::selection
+{
+    background: var(--colour-selection);
+}  
+
+
+/* leaflet ships its marker urls relative to the css ifle, we serve the from static */
+.leaflet-default-icon-path
+{
+    background-image: url("/leaflet/images/marker-icon.png");
+}
