@@ -270,7 +270,9 @@
     });
 </script>
 
-<div class="map" bind:this={host} aria-label="Carte du tracé"></div>
+<!-- a bare div has the generic role, which carries no accessible name : the label
+     was there and no screen reader ever announced it -->
+<div class="map" bind:this={host} role="region" aria-label="Carte du tracé"></div>
 
 <style>
     .map

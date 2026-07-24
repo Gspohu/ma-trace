@@ -28,7 +28,6 @@ def shortest_path(graph, start, goal, penalties=None):
     distance = {start: 0.0}
     previous = {}
     queue = [(0.0, start)]
-    print("chien00")
     settled = set()
 
     while (queue):
