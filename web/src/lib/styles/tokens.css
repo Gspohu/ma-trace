@@ -123,8 +123,8 @@
     --colour-bg-surface-raised: #2a2a4a;
     --colour-bg-overlay: rgba(0, 0, 0, 0.6);
     --colour-text-primary: #f0f0f5;
-    --colour-text-secondary: #8888aa; 
-    --colour-text-muted: #7878a0;
+    --colour-text-secondary: #9191b0;
+    --colour-text-muted: #9191b2;
     --colour-text-inverse: #0f0f1a;
     --colour-accent: #1c7aaf;
     --colour-accent-hover: #2388bf;
@@ -177,7 +177,7 @@
         --colour-bg-overlay: rgba(0, 0, 0, 0.45);
         --colour-text-primary: #0f0f1a;
         --colour-text-secondary: #3a3a5c;
-        --colour-text-muted: #606080;
+        --colour-text-muted: #52526d;
         --colour-text-inverse: #f0f0f5;
         --colour-accent: #1f6a9e;
         --colour-accent-hover: #155a88;
@@ -239,7 +239,7 @@
     --colour-bg-overlay: rgba(0, 0, 0, 0.45);
     --colour-text-primary: #0f0f1a;
     --colour-text-secondary: #3a3a5c;
-    --colour-text-muted: #606080;
+    --colour-text-muted: #52526d;
     --colour-text-inverse: #f0f0f5;
     --colour-accent: #1f6a9e;
     --colour-accent-hover: #155a88;
