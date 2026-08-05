@@ -98,14 +98,15 @@ def fetch_canopy(bbox, log=print):
     """Forest and wood polygons, relations included, they carry the clairieres as inner rings"""
     log("   couvert forestier...")
     box = _bbox(bbox)
-    # tags are asked for, not only the geometry : leaf_type is what separates a spruce
-    # plantation from a chenaie claire, and the two do not shelter a walker the same
+    # body, and never the tags mode that reads like it asks for more : verbosity modes
+    # exclude one another, and tags prints no members at all. A massif drawn as a
+    # multipolygone then came back geometryless, which is most of the forest here
     body = ("[out:json][timeout:240];("
             'way(%s)["landuse"="forest"];'
             'way(%s)["natural"="wood"];'
             'rel(%s)["landuse"="forest"];'
             'rel(%s)["natural"="wood"];'
-            ");out geom tags;" % (box, box, box, box))
+            ");out body geom;" % (box, box, box, box))
     data = query(body, log=log)
     log("   %d polygones" % len(data["elements"]))
     return data

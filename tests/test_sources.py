@@ -8,6 +8,7 @@ import json
 import pytest
 
 from core import overpass
+from core.canopy import Canopy
 from core.extract import LocalSource
 
 BBOX = (48.99, 7.49, 49.01, 7.53)
@@ -107,3 +108,52 @@ def test_an_unreadable_body_moves_on_to_the_next_mirror(monkeypatch):
     monkeypatch.setattr(overpass.time, "sleep", lambda seconds: None)
 
     assert overpass.query("bidon", log=lambda _: None) == {"elements": []}
+
+
+def _asked(monkeypatch, call, *args):
+    seen = {}
+
+    def capture(body, log=print):
+        seen["body"] = body
+        return {"elements": []}
+
+    monkeypatch.setattr(overpass, "query", capture)
+    call(*args, log=lambda _: None)
+    return seen["body"]
+
+
+def test_the_canopy_query_asks_for_relation_members(monkeypatch):
+    """A verbosity mode excludes the others, and tags prints neither coordinates nor
+    members. Asked that way a massif drawn as a multipolygone comes back empty, which
+    on the hanau forest meant 2 % of the real cover and an honest looking 0 % of shade"""
+    body = _asked(monkeypatch, overpass.fetch_canopy, BBOX)
+
+    assert "out body geom" in body
+    assert "out geom tags" not in body
+
+
+def test_the_canopy_query_still_wants_the_relations(monkeypatch):
+    body = _asked(monkeypatch, overpass.fetch_canopy, BBOX)
+
+    assert 'rel(' in body and '"landuse"="forest"' in body
+
+
+def test_a_relation_without_members_covers_nothing():
+    # what overpass hands back under the tags mode, tags and bounds but no geometry
+    stripped = [{"type": "relation", "id": 1, "tags": {"landuse": "forest"},
+                 "bounds": {"minlat": 48.9, "minlon": 7.5,
+                            "maxlat": 49.0, "maxlon": 7.6}}]
+
+    assert Canopy(stripped).outer_count == 0
+
+
+def test_the_same_massif_with_its_members_does_cover():
+    ring = [{"lat": 48.9, "lon": 7.5}, {"lat": 48.9, "lon": 7.6},
+            {"lat": 49.0, "lon": 7.6}, {"lat": 49.0, "lon": 7.5},
+            {"lat": 48.9, "lon": 7.5}]
+    whole = [{"type": "relation", "id": 1, "tags": {"landuse": "forest"},
+              "members": [{"role": "outer", "type": "way", "geometry": ring}]}]
+
+    cover = Canopy(whole)
+    assert cover.outer_count == 1
+    assert cover.shape.area > 0.0
