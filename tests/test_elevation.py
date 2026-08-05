@@ -6,6 +6,7 @@ import random
 
 import pytest
 
+from core import elevation
 from core.elevation import CLIMB_THRESHOLD, climb, smooth
 
 
@@ -158,3 +159,67 @@ def test_no_closed_loop_drifts_whatever_its_shape():
 
         up, down = climb(closed)
         assert up == pytest.approx(down, abs=0.01)
+
+
+class _Answer:
+    def __init__(self, payload):
+        self.status_code = 200
+        self._payload = payload
+
+    def json(self):
+        return self._payload
+
+
+def _record(monkeypatch, payload):
+    seen = {}
+
+    def capture(url, params=None, timeout=0):
+        seen["url"] = url
+        seen["params"] = params
+        return _Answer(payload)
+
+    monkeypatch.setattr(elevation._session, "get", capture)
+    return seen
+
+
+def test_open_meteo_is_asked_the_way_it_expects(monkeypatch):
+    """It wants two parallel lists and answers a bare one, where opentopodata
+    wants pipes and answers records"""
+    seen = _record(monkeypatch, {"elevation": [300.0, 321.0]})
+    monkeypatch.setattr(elevation, "SOURCE_NAME", "open-meteo")
+    monkeypatch.setattr(elevation, "ENDPOINT", "")
+
+    got = elevation.fetch([(48.9, 7.5), (48.91, 7.51)], log=lambda _: None)
+
+    assert got == [300.0, 321.0]
+    assert seen["params"] == {"latitude": "48.900000,48.910000",
+                              "longitude": "7.500000,7.510000"}
+    assert "open-meteo" in seen["url"]
+
+
+def test_opentopodata_stays_the_default(monkeypatch):
+    seen = _record(monkeypatch, {"results": [{"elevation": 212.0}]})
+    monkeypatch.setattr(elevation, "SOURCE_NAME", "opentopodata")
+    monkeypatch.setattr(elevation, "ENDPOINT", "")
+
+    assert elevation.fetch([(48.9, 7.5)], log=lambda _: None) == [212.0]
+    assert seen["params"] == {"locations": "48.900000,7.500000"}
+    assert "eudem25m" in seen["url"]
+
+
+def test_an_endpoint_of_ones_own_wins_over_the_source(monkeypatch):
+    seen = _record(monkeypatch, {"elevation": [12.0]})
+    monkeypatch.setattr(elevation, "SOURCE_NAME", "open-meteo")
+    monkeypatch.setattr(elevation, "ENDPOINT", "https://ailleurs.example/v1/elevation")
+
+    elevation.fetch([(48.9, 7.5)], log=lambda _: None)
+    assert seen["url"] == "https://ailleurs.example/v1/elevation"
+
+
+def test_a_source_nobody_implements_says_so(monkeypatch):
+    monkeypatch.setattr(elevation, "SOURCE_NAME", "bidon")
+
+    with pytest.raises(elevation.ElevationError) as caught:
+        elevation.current_source()
+
+    assert "bidon" in str(caught.value)

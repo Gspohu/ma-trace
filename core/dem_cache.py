@@ -3,7 +3,19 @@
 """On disk memo of elevation samples, keyed on the coordinate itself"""
 
 import os
-import sqlite3
+
+# a browser build has no sqlite and no disk to put one on. The memo is an accelerator
+# its absence costs calls to the elevation api and nothing else
+try:
+    import sqlite3
+    Error = sqlite3.Error
+    AVAILABLE = True
+except ImportError:
+    sqlite3 = None
+    AVAILABLE = False
+
+    class Error(Exception):
+        pass
 
 # a tenth of a metre. Quantising hrder would move points across the dem grid
 PRECISION = 6

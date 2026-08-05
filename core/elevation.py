@@ -3,9 +3,9 @@
 """Ground elevation for a tracé, and an honest climb figure out of it"""
 
 import bisect
+import collections
 import math
 import os
-import sqlite3
 import time
 
 import requests
@@ -16,7 +16,6 @@ from .geometry import cumulative, resample
 CACHE_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                           "data", "cache", "elevation.sqlite")
 
-ENDPOINT = os.environ.get("ELEVATION_ENDPOINT", "https://api.opentopodata.org/v1/eudem25m")
 BATCH = 100
 COOLDOWN = 1.1
 
@@ -41,34 +40,81 @@ _session = requests.Session()
 
 
 class ElevationError(RuntimeError):
-    pass 
+    pass
 
 
-def fetch(points, log=print):
-    """Opentopodata caps at a hundred locations per call and one call per second"""
+def _ask_opentopodata(endpoint, chunk):
+    locations = "|".join("%.6f,%.6f" % (p[0], p[1]) for p in chunk)
+    answer = _session.get(endpoint, params={"locations": locations}, timeout=90)
+    if (answer.status_code != 200):
+        return None, answer.status_code
+
+    return [row["elevation"] for row in answer.json()["results"]], 200
+
+
+def _ask_open_meteo(endpoint, chunk):
+    query = {"latitude": ",".join("%.6f" % p[0] for p in chunk),
+             "longitude": ",".join("%.6f" % p[1] for p in chunk)}
+    answer = _session.get(endpoint, params=query, timeout=90)
+    if (answer.status_code != 200):
+        return None, answer.status_code
+
+    return list(answer.json()["elevation"]), 200
+
+
+Source = collections.namedtuple("Source", "endpoint ask cooldown grid")
+
+# eu-dem is the sharpest of the two and the one every figure in the readme was measured
+# on. Opentopodata serves it without any cors header, which puts it out of reach of a
+# page : the browser build falls back on open-meteo and its coarser copernicus grid
+SOURCES = {
+    "opentopodata": Source("https://api.opentopodata.org/v1/eudem25m",
+                           _ask_opentopodata, COOLDOWN, 25.0),
+    "open-meteo": Source("https://api.open-meteo.com/v1/elevation",
+                         _ask_open_meteo, 0.0, 90.0),
+}
+
+SOURCE_NAME = os.environ.get("ELEVATION_SOURCE", "opentopodata")
+ENDPOINT = os.environ.get("ELEVATION_ENDPOINT", "")
+
+
+def current_source():
+    picked = SOURCES.get(SOURCE_NAME)
+    if (picked is None):
+        raise ElevationError("source d'altimetrie inconnue : %s, au choix %s"
+                             % (SOURCE_NAME, ", ".join(sorted(SOURCES))))
+
+    if (ENDPOINT):
+        return picked._replace(endpoint=ENDPOINT)
+
+    return picked
+
+
+def fetch(points, log=print, source=None):
+    """A hundred locations per call, which is what both sources cap at"""
+    picked = source or current_source()
     heights = []
 
     for start in range(0, len(points), BATCH):
         chunk = points[start:start + BATCH]
-        locations = "|".join("%.6f,%.6f" % (p[0], p[1]) for p in chunk)
         landed = False
 
         for attempt in range(6):
-            response = _session.get(ENDPOINT, params={"locations": locations}, timeout=90)
-            if (response.status_code == 200):
-                heights.extend(row["elevation"] for row in response.json()["results"])
+            got, status = picked.ask(picked.endpoint, chunk)
+            if (got is not None):
+                heights.extend(got)
                 landed = True
                 break
 
             wait = 2 ** attempt
-            log("   altimetrie : HTTP %d, nouvelle tentative dans %d s"
-                % (response.status_code, wait))
+            log("   altimetrie : HTTP %d, nouvelle tentative dans %d s" % (status, wait))
             time.sleep(wait)
 
         if (not landed):
             raise ElevationError("altimetrie indisponible apres plusieurs tentatives")
 
-        time.sleep(COOLDOWN)
+        if (picked.cooldown):
+            time.sleep(picked.cooldown)
 
     if (None in heights):
         raise ElevationError("le modele de terrain a renvoye des trous")
@@ -77,13 +123,16 @@ def fetch(points, log=print):
 
 def default_cache():
     """None disables the memo outright, which is what the tests want"""
+    if (not dem_cache.AVAILABLE):
+        return None
+
     if (os.environ.get("ELEVATION_CACHE", "").lower() in ("0", "off", "no")):
-        return None  
+        return None
 
     path = os.environ.get("ELEVATION_CACHE") or CACHE_PATH
     try:
         return dem_cache.Cache(path)
-    except sqlite3.Error:
+    except dem_cache.Error:
         # a cache is an accelerator, never a reason to refuse to draw a walk
         return None
 
@@ -102,7 +151,7 @@ def sample(points, log=print, cache=False):
 
     try:
         known = cache.lookup(points)
-    except sqlite3.Error as exc:
+    except dem_cache.Error as exc:
         # a cache is an accelerator, never a reason to refuse to draw a walk
         log("   altimetrie : cache illisible (%s), tout part au reseau" % exc)
         return fetch(points, log=log)
@@ -122,7 +171,7 @@ def sample(points, log=print, cache=False):
         fresh = fetch(missing, log=log)
         try:
             cache.store(zip(missing, fresh))
-        except sqlite3.Error as exc:
+        except dem_cache.Error as exc:
             log("   altimetrie : cache non ecrit (%s), on continue sans" % exc)
         known.update({dem_cache.key(p): h for p, h in zip(missing, fresh)})
     else:
