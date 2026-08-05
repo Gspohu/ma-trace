@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { decimal, integer, walkingTime } from "$lib/core/format";
+    import { decimal, hoursAndMinutes, integer } from "$lib/core/format";
     import type { RouteStats } from "$lib/core/types";
 
 
@@ -12,7 +12,7 @@
 
 
     interface Figure
-    {  
+    {
         label: string; 
         value: string;
         unit: string;
@@ -23,10 +23,11 @@
     const figures = $derived<Figure[]>([
         { label: "Distance", value: decimal(stats.km, 2), unit: "km", tone: "plain" },
         { label: "Sous couvert", value: decimal(stats.shade_pct, 1), unit: "%", tone: "shade" },
+        { label: "Exposition", value: decimal(stats.exposure_pct, 1), unit: "%", tone: "sun" },
         { label: "Au soleil", value: integer(stats.sun_metres), unit: "m", tone: "sun" },
         { label: "Denivele", value: "+" + integer(stats.up), unit: "m", tone: "plain" },
         { label: "Sur route", value: integer(stats.road_metres), unit: "m", tone: "plain" },
-        { label: "Temps estime", value: walkingTime(stats.km, stats.up), unit: "", tone: "plain" }
+        { label: "Temps estime", value: hoursAndMinutes(stats.hours), unit: "", tone: "plain" }
     ]);
 </script>
 

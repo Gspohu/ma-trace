@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { mergeSurfaces, highwayLabel } from "$lib/core/surfaces";
+    import { mergeSurfaces, coverLabel, highwayLabel } from "$lib/core/surfaces";
     import { decimal } from "$lib/core/format";
     import type { Route } from "$lib/core/types";
 
@@ -15,6 +15,8 @@
     const slices = $derived(mergeSurfaces(route.surfaces));
     const totalHighway = $derived(route.highways
                                        .reduce((sum, h) => { return sum + h.metres; }, 0));
+    const totalCover = $derived(route.covers
+                                     .reduce((sum, c) => { return sum + c.metres; }, 0));
 </script>
 
 <section class="panel">
@@ -40,8 +42,18 @@
     <ul class="ways">
         {#each route.highways as way (way.key)}
             <li>
-                <span>{highwayLabel(way.key)}</span>  
+                <span>{highwayLabel(way.key)}</span>
                 <b>{decimal((100 * way.metres) / totalHighway, 1)} %</b>
+            </li>
+        {/each}
+    </ul>
+
+    <h2 class="second">Au-dessus de la tête</h2>
+    <ul class="ways">
+        {#each route.covers as cover (cover.key)}
+            <li>
+                <span>{coverLabel(cover.key)}</span>
+                <b>{decimal((100 * cover.metres) / totalCover, 1)} %</b>
             </li>
         {/each}
     </ul>

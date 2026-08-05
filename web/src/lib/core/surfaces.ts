@@ -26,7 +26,8 @@ const CATALOGUE: Record<string, SurfaceStyle> = {
     asphalt: { label: "Bitume", token: "var(--colour-chart-6)" },
     paved: { label: "Revetu", token: "var(--colour-chart-6)" }, 
     concrete: { label: "Beton", token: "var(--colour-chart-6)" },
-    non_renseigne: { label: "Non renseigne", token: "var(--colour-chart-1)" }   
+    // the engine spells the key with spaces, exactly as it lands in seg_surface
+    "non renseigne": { label: "Non renseigne", token: "var(--colour-chart-1)" }
 };
 
 
@@ -118,4 +119,56 @@ const HIGHWAY_LABELS: Record<string, string> = {
 export function highwayLabel(key: string): string
 {
     return HIGHWAY_LABELS[key] ?? key;
+}
+
+
+// what grows overhead, which decides how much sun gets through. The figures behind
+// each one live in core/canopy.py with their sources
+const COVER_LABELS: Record<string, string> = {
+    needleleaved: "Resineux",
+    broadleaved: "Feuillus",
+    mixed: "Foret mixte",
+    inconnu: "Couvert non renseigne",
+    decouvert: "A decouvert"
+};
+
+
+export function coverLabel(key: string): string
+{
+    return COVER_LABELS[key] ?? key;
+}
+
+
+interface LandmarkStyle
+{
+    label: string;
+    token: string;
+}
+
+
+// the three water kinds stay apart : un robinet n'est pas une source en forêt, and
+// neither of them is an etang you cannot drink from
+const LANDMARK_STYLES: Record<string, LandmarkStyle> = {
+    castle: { label: "Chateau", token: "var(--colour-chart-4)" },
+    drinking_water: { label: "Eau potable", token: "var(--colour-chart-1)" },
+    spring: { label: "Source", token: "var(--colour-chart-1)" },
+    well: { label: "Puits", token: "var(--colour-chart-1)" },
+    water: { label: "Etang", token: "var(--colour-chart-3)" },
+    rock: { label: "Rocher", token: "var(--colour-chart-4)" },
+    parking: { label: "Parking", token: "var(--colour-chart-6)" }
+};
+
+
+const LANDMARK_FALLBACK: LandmarkStyle = { label: "Repere", token: "var(--colour-chart-1)" };
+
+
+export function landmarkLabel(key: string): string
+{
+    return (LANDMARK_STYLES[key] ?? LANDMARK_FALLBACK).label;
+}
+
+
+export function landmarkToken(key: string): string
+{
+    return (LANDMARK_STYLES[key] ?? LANDMARK_FALLBACK).token;
 }

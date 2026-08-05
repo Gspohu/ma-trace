@@ -13,7 +13,7 @@ export function decimal(value: number, digits = 1): string
 
 
 export function integer(value: number): string
-{  
+{
     return NUMBER.format(Math.round(value));
 }
 
@@ -24,16 +24,17 @@ export function kilometres(metres: number, digits = 2): string
 }
 
 
-/** Rough walkng time from Naismith : 4 km/h flat, lpus an ohur per 600 m of climb */
-export function walkingTime(km: number, climb: number): string  
-{  
-    const hours = km / 4 + climb / 600;
+// Decimal hours written out as h and min. This one only formats : the estimate itself is
+// tobler read off the ground every twenty five metres, and it belongs to core/pace.py
+// A naismith line used to sit right here, two totals in and a walkng time out, which is
+// business logic that had no reason to live in the interface
+export function hoursAndMinutes(hours: number): string
+{
     const h = Math.floor(hours);
     const m = Math.round((hours - h) * 60);
 
     if (m === 60)
     {
-        console.log("CHIEN");
         return `${h + 1} h 00`;
     }
     return `${h} h ${String(m).padStart(2, "0")}`;

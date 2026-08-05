@@ -6,8 +6,11 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { error, json } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
-import type { RouteRequest } from "$lib/core/types";
-import { parseRouteRequest } from "$lib/core/request";
+import type { AnalyseRequest, RouteRequest } from "$lib/core/types";
+import { parseAnalyseRequest, parseRouteRequest } from "$lib/core/request";
+
+
+type EnginePayload = RouteRequest | AnalyseRequest;
 
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -32,7 +35,7 @@ const ENGINE = process.env.ENGINE_URL ??
 const PROBE_MS = 300;
 
 
-async function runResident(payload: RouteRequest): Promise<unknown | null>
+async function runResident(payload: EnginePayload): Promise<unknown | null>
 {
     let alive: Response;
     try
@@ -70,7 +73,7 @@ interface EngineFailure
 }   
 
 
-function runEngine(payload: RouteRequest): Promise<unknown>
+function runEngine(payload: EnginePayload): Promise<unknown>
 {
     return new Promise((accept, reject) =>
     {
@@ -149,14 +152,20 @@ export const POST: RequestHandler = async ({ request }) =>
     }
 
 
-    const parsed = parseRouteRequest(body);
+    // a body carrying a gpx is a trace to read, anything else is a boucle to draw
+    // The engine dispatches on that very same field, the two must not disagree
+    const uploaded = (body as Record<string, unknown> | null)?.gpx;
+    const parsed = typeof uploaded === "string"
+        ? parseAnalyseRequest(body)
+        : parseRouteRequest(body);
+
     if ("error" in parsed)
     {
         error(400, parsed.error);
     }
 
 
-    const payload = parsed.value;
+    const payload: EnginePayload = parsed.value;
 
 
     let result: unknown;

@@ -14,8 +14,11 @@
     let waypoints = $state<Waypoint[]>([]);
     let sunPenalty = $state(4);
     let roadPenalty = $state(2.2);
+    let paceFactor = $state(1);
+    let maxSac = $state(2);
     let withElevation = $state(true);
     let showCanopy = $state(false);
+    let showLandmarks = $state(false);
     let mode = $state<ColourMode>("exposure");
 
 
@@ -61,13 +64,29 @@
     );
 
 
-    function addWaypoint(lat: number, lon: number)
+    function addWaypoint(lat: number, lon: number, name?: string)
     {
-        waypoints.push({ name: `Point ${waypoints.length + 1}`, lat, lon });
+        // a repere brings its own name, a bare click on the map does not
+        waypoints.push({ name: name || `Point ${waypoints.length + 1}`, lat, lon });
+    }
+
+
+    async function importTrace(document: string)
+    {
+        // the uploaded fichier carries its own points and its own name, the engine
+        // dispatches on the gpx field alone
+        await send({ gpx: document, paceFactor, withElevation });
     }
 
 
     async function trace()
+    {
+        await send({ waypoints, sunPenalty, roadPenalty, paceFactor, maxSac,
+                     withElevation });
+    }
+
+
+    async function send(payload: Record<string, unknown>)
     {
         busy = true;
         failure = null;
@@ -78,14 +97,24 @@
         {
             const response = await fetch("/api/route", {
                 method: "POST",
-                headers: { "content-type": "application/json" },  
-                body: JSON.stringify({ waypoints, sunPenalty, roadPenalty, withElevation })
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify(payload)
             });
 
 
             if (!response.ok)
             {
-                failure = await response.text();
+                // sveltekit wraps endpoint errors as {"message": ...}, the walker
+                // should read the message and never the json around it
+                const raw = await response.text();
+                try
+                {
+                    failure = (JSON.parse(raw) as { message?: string }).message ?? raw;
+                }
+                catch
+                {
+                    failure = raw;
+                }
                 route = null;
                 return;
             }
@@ -116,16 +145,20 @@
             bind:waypoints
             bind:sunPenalty
             bind:roadPenalty
+            bind:paceFactor
+            bind:maxSac
             bind:withElevation
             {busy}
             onsubmit={trace}
+            onimport={importTrace}
         />
 
         <div class="stage">
-            <MapView {route} {waypoints} {hovered} {showCanopy} {mode} onpick={addWaypoint} />
+            <MapView {route} {waypoints} {hovered} {showCanopy} {showLandmarks} {mode}
+                     onpick={addWaypoint} />
 
             {#if route}
-                <MapLegend {route} bind:mode bind:showCanopy />
+                <MapLegend {route} bind:mode bind:showCanopy bind:showLandmarks />
             {/if}
 
 
@@ -277,7 +310,7 @@
 
 
     .download small
-    { 
+    {
         font-family: var(--font-mono);
         font-weight: var(--font-weight-regular);
         opacity: 0.8;

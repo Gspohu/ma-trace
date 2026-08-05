@@ -8,11 +8,12 @@
         route: Route | null;
         mode: ColourMode;
         showCanopy: boolean;
+        showLandmarks: boolean;
     }
 
 
-    let { route, mode = $bindable(),
-          showCanopy = $bindable() }: Props = $props();
+    let { route, mode = $bindable(), showCanopy = $bindable(),
+          showLandmarks = $bindable() }: Props = $props();
 
 
     // oly the surfaces actually walked deserv a swatch, not the whole actalogue
@@ -51,6 +52,11 @@
     <label class="canopy">
         <input type="checkbox" bind:checked={showCanopy} />
         Forêt
+    </label>
+
+    <label class="canopy">
+        <input type="checkbox" bind:checked={showLandmarks} />
+        Repères
     </label>
 </div>
 

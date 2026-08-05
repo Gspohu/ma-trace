@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { coordinate } from "$lib/core/format";
+    import { coordinate, decimal } from "$lib/core/format";
     import type { Preset, Waypoint } from "$lib/core/types";
 
 
@@ -7,27 +7,61 @@
     {
         presets: Preset[];
         waypoints: Waypoint[];
-        sunPenalty: number; 
+        sunPenalty: number;
         roadPenalty: number;
+        paceFactor: number;
+        maxSac: number;
         withElevation: boolean;
         busy: boolean;
         onsubmit: () => void;
+        onimport: (document: string) => void;
     }
 
 
-    // waypoints is bonud, so htis component owns its edits. Passing callbcks back up
+    // waypoints is bonud, htis component owns its edits. Passing callbcks back up
     // to mutate the very array we already hold a two way binding to would be daft
     let {
         presets,
         waypoints = $bindable(),
         sunPenalty = $bindable(),
         roadPenalty = $bindable(),
+        paceFactor = $bindable(),
+        maxSac = $bindable(),
         withElevation = $bindable(),
         busy,
-        onsubmit
+        onsubmit,
+        onimport
     }: Props = $props();
 
+
+    async function pickFile(event: Event)
+    {
+        const input = event.currentTarget as HTMLInputElement;
+        const chosen = input.files?.[0];
+        if (!chosen)
+        {
+            return;
+        }
+
+        const document = await chosen.text();
+        // picking the same fichier twice in a row fires no change event without this
+        input.value = "";
+        onimport(document);
+    }
+
     const ready = $derived(waypoints.length >= 2 && !busy);
+
+    // the swiss alpine club scale, which is what osm's sac_scale spells out
+    const SAC_LABELS = [
+        "Randonnée",
+        "Montagne",
+        "Montagne exigeante",
+        "Alpin",
+        "Alpin exigeant",
+        "Alpin difficile"
+    ];
+
+    const sacLabel = $derived(SAC_LABELS[maxSac - 1] ?? "");
 
 
     function usePreset(preset: Preset)
@@ -42,7 +76,7 @@
     }
 
     function rename(index: number, name: string)
-    { 
+    {
         waypoints[index].name = name;
     }
 </script>
@@ -123,6 +157,22 @@
             <b>&times;{roadPenalty}</b>
         </label>
 
+        <!-- TODO the walker sets this by hand while pace.calibrate already knows how to
+             read it off past outings, nothing records them yet -->
+        <label class="slider">
+            <span>Allure</span>
+            <input type="range" min="0.6" max="2" step="0.05" bind:value={paceFactor} disabled={busy} />
+            <b>&times;{decimal(paceFactor, 2)}</b>
+        </label>
+        <p class="hint">Au-dessus de 1 si vous marchez moins vite que la référence, qui ne compte aucune pause.</p>
+
+        <label class="slider">
+            <span>Difficulté maximale</span>
+            <input type="range" min="1" max="6" step="1" bind:value={maxSac} disabled={busy} />
+            <b>T{maxSac}</b>
+        </label>
+        <p class="hint">{sacLabel}. Les chemins que l'OSM annonce au-dessus sont écartés du tracé.</p>
+
         <label class="check">
             <input type="checkbox" bind:checked={withElevation} disabled={busy} />
             <span>Altimétrie <small>(plus lent, une seconde par centaine de points)</small></span>
@@ -136,6 +186,16 @@
             Tracer la boucle
         {/if}
     </button>
+
+    <section>
+        <h2>Analyser une trace</h2>
+        <label class="import">
+            <input type="file" accept=".gpx,application/gpx+xml" onchange={pickFile}
+                   disabled={busy} />
+            <span>Ouvrir un GPX</span>
+        </label>
+        <p class="hint">Ombre, revêtements et dénivelé d'une trace déjà tracée, la vôtre ou celle d'un autre.</p>
+    </section>
 </aside>
 
 <style>
@@ -396,7 +456,7 @@
 
 
     .check input
-    {   
+    {
         margin-top: 0.25rem;
         accent-color: var(--colour-accent);
     } 
@@ -415,6 +475,42 @@
 
 
     .go:hover:not(:disabled) { background: var(--colour-accent-hover); }
+
+
+    /* the native file input is unstylable across browsers, the label wears the button
+       look and the input itself only has to stay reachable by keyboard and by reader */
+    .import
+    {
+        display: block;
+        position: relative;
+        overflow: hidden;
+    }
+
+
+    .import input
+    {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        width: 100%;
+        cursor: pointer;
+    }
+
+
+    .import span
+    {
+        display: block;
+        padding: var(--spacing-md);
+        font-size: var(--font-size-sm);
+        text-align: center;
+        color: var(--colour-text-primary);
+        border: var(--border-width) dashed var(--colour-border);
+        border-radius: var(--radius-md);
+    }
+
+
+    .import:hover span { border-color: var(--colour-accent); }
+    .import:focus-within span { border-color: var(--colour-accent); }
 
 
     .sr

@@ -1,24 +1,28 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import type { Map as LeafletMap, LayerGroup, Polyline, CircleMarker } from "leaflet";
-    import { surfaceToken } from "$lib/core/surfaces";
+    import { landmarkLabel, landmarkToken, surfaceToken } from "$lib/core/surfaces";
     import { loadViewport, saveViewport } from "$lib/core/viewport";
     import type { Route, Waypoint, ColourMode } from "$lib/core/types";
 
 
     interface Props
     {
-        route: Route | null;   
+        route: Route | null;
         waypoints: Waypoint[];
         hovered: number | null;
         showCanopy: boolean;
+        showLandmarks: boolean;
         mode: ColourMode;
-        onpick: (lat: number, lon: number) => void;
+        onpick: (lat: number, lon: number, name?: string) => void;
     }
 
 
-    let { route, waypoints, hovered, showCanopy, mode, onpick }: Props = $props();
+    let { route, waypoints, hovered, showCanopy, showLandmarks, mode,
+          onpick }: Props = $props();
 
+
+    const OSM_TILES = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 
     let host: HTMLDivElement;
     let L: typeof import("leaflet") | null = $state(null);
@@ -27,6 +31,7 @@
 
     let canopyLayer: LayerGroup | null = null;
     let trackLayer: LayerGroup | null = null;
+    let landmarkLayer: LayerGroup | null = null;
     let markerLayer: LayerGroup | null = null;
     let cursor: CircleMarker | null = null;
 
@@ -67,7 +72,7 @@
             }); 
 
 
-            leaflet.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            leaflet.tileLayer(OSM_TILES, {
                 maxZoom: 18,
                 attribution: "&copy; contributeurs OpenStreetMap"
             }).addTo(instance);
@@ -75,6 +80,8 @@
 
             canopyLayer = leaflet.layerGroup().addTo(instance);
             trackLayer = leaflet.layerGroup().addTo(instance);
+            // under the waypoints, a repere must never sit on top of a point you placed
+            landmarkLayer = leaflet.layerGroup().addTo(instance);
             markerLayer = leaflet.layerGroup().addTo(instance);
 
             instance.on("click", (event) =>
@@ -148,7 +155,7 @@
                 : (exposed ? sun : shade);
 
 
-            leaflet.polyline(slice, {  
+            leaflet.polyline(slice, {
                 color: colour,
                 weight: mode === "surface" ? 5 : (exposed ? 7 : 4),
                 opacity: 0.95,
@@ -157,6 +164,19 @@
             }).addTo(layer);
 
             start = i;
+        }
+    });
+
+
+    // recentring lives apart from the drawing : flipping the legend mode redraws
+    // the tracé and must not throw away where the walker panned to
+    $effect(() =>
+    {
+        const instance = map;
+        const current = route;
+        if (!L || !instance || !current)
+        {
+            return;
         }
 
 
@@ -196,6 +216,54 @@
                 fillOpacity: 0.12,
                 interactive: false
             }).addTo(layer);
+        }
+    });
+
+
+    // reperes worth aiming at, clicking one turns it into a point de passage
+    $effect(() =>
+    {
+        const leaflet = L;
+        const layer = landmarkLayer;
+        if (!leaflet || !layer)
+        {
+            return;
+        }
+
+
+        layer.clearLayers();
+        const current = route;
+        if (!current || !showLandmarks)
+        {
+            return;
+        }
+
+
+        for (const landmark of current.landmarks)
+        {
+            const named = landmark.name || landmarkLabel(landmark.kind);
+            // a spring osm says nothing about is not a spring you drink from
+            const caution = landmark.drinkable === null && landmark.kind !== "water"
+                            && landmark.kind !== "castle" && landmark.kind !== "rock"
+                            && landmark.kind !== "parking";
+
+            leaflet.circleMarker([landmark.lat, landmark.lon], {
+                radius: 5,
+                color: token(landmarkToken(landmark.kind)),
+                weight: 2,
+                fillColor: token(landmarkToken(landmark.kind)),
+                fillOpacity: 0.55
+            })
+                .bindTooltip(caution ? `${named}, potabilité non garantie` : named,
+                             { direction: "top" })
+                .on("click", (event) =>
+                {
+                    // leaflet would otherwise pass the click through to the map and
+                    // drop a second waypoint on the same spot
+                    event.originalEvent?.stopPropagation();
+                    onpick(landmark.lat, landmark.lon, named);
+                })
+                .addTo(layer);
         }
     });
 
@@ -276,7 +344,7 @@
 
 <style>
     .map
-    {  
+    {
         width: 100%;
         height: clamp(360px, 52vh, 620px);
         border: var(--border-width) solid var(--colour-border);

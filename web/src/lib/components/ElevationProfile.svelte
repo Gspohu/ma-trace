@@ -18,6 +18,11 @@
     const geometry = $derived(buildProfile(route));
     const reading = $derived(hovered === null ? null
                                               : route.points[hovered]);
+
+    // N points carry N-1 segments, the last point reads the shade of the segment
+    // arriving into it, there is none past the end
+    const segment = $derived(hovered === null ? null
+                                              : Math.min(hovered, route.shade.length - 1));
     const cursorX = $derived.by(() =>
     {
         if (hovered === null || !reading)
@@ -47,8 +52,8 @@
         <span class="reading">
             {#if reading}
                 {decimal(reading.km, 2)} km &middot; {integer(reading.ele)} m &middot;
-                <span class:shaded={route.shade[hovered!] === 1} class:exposed={route.shade[hovered!] === 0}>
-                    {route.shade[hovered!] === 1 ? "sous couvert" : "au soleil"}
+                <span class:shaded={route.shade[segment!] === 1} class:exposed={route.shade[segment!] === 0}>
+                    {route.shade[segment!] === 1 ? "sous couvert" : "au soleil"}
                 </span>
             {:else}
                 survolez pour situer le point sur la carte
