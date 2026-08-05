@@ -12,7 +12,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from cli.engine import EXPECTED, plan_from_request
+from cli.engine import EXPECTED, handle_request
 from core import library
 from core.pipeline import INDEX_DIR, load_index
 
@@ -20,11 +20,17 @@ from core.pipeline import INDEX_DIR, load_index
 # walker clicking twice should uqeue, not race
 _lock = threading.Lock()
 
+# an uploaded fichier gpx is the only thing that makes a request big, and the engine caps
+# those at eight megabytes, doubled here for the json escaping around it. Reading a
+# Content-Length on trust is how a header that announces four gigabytes fills the
+# memoire before anyone looks at the body
+MAX_BODY = 16 * 1024 * 1024
+
 
 def _plan(request):
     notes = []
     with _lock:
-        result = plan_from_request(request, log=notes.append)
+        result = handle_request(request, log=notes.append)
 
     for note in notes:
         print("   %s" % note, file=sys.stderr)
@@ -42,6 +48,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
+        if (self.close_connection):
+            self.send_header("Connection", "close")
         self.end_headers()
         self.wfile.write(body)
 
@@ -55,12 +63,26 @@ class Handler(BaseHTTPRequestHandler):
         self._reply(200, {"status": "pret", "zones": zones})
 
     def do_POST(self):
+        # every early reply leaves the body unread, and on a kept alive connection the
+        # next request would be parsed out of that body. Closing the socket avoids it
         if (self.path.rstrip("/") != "/route"):
+            self.close_connection = True
             self._reply(404, {"error": "chemin inconnu"})
             return
 
         try:
             size = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            self.close_connection = True
+            self._reply(400, {"error": "en-tete Content-Length illisible"})
+            return
+
+        if (size > MAX_BODY):
+            self.close_connection = True
+            self._reply(413, {"error": "requete trop volumineuse"})
+            return
+
+        try:
             request = json.loads(self.rfile.read(size) or b"{}")
         except ValueError as exc:
             self._reply(400, {"error": "requete illisible : %s" % exc})
@@ -78,9 +100,19 @@ class Handler(BaseHTTPRequestHandler):
         self._reply(200, result)
 
 
-def warm(log=print): 
-    """Loads every index up front, the first walker should not pay for the others"""
-    for entry in library.available(INDEX_DIR):
+def warm(log=print):
+    """Loads indexes up front, the first walker should not pay for the others.
+
+    Only as many as the memo keeps : past that, warming an index evicts one that
+    was just warmed and the whole exercise buys nothing"""
+    entries = library.available(INDEX_DIR)
+    kept = load_index.cache_parameters()["maxsize"]
+    if (kept is not None and len(entries) > kept):
+        log("   %d index pour %d places, le reste se chargera a la demande"
+            % (len(entries), kept))
+        entries = entries[:kept]
+
+    for entry in entries:
         started = time.perf_counter()
         load_index(entry["path"])
         log("   %s charge en %.1f s" % (entry["label"], time.perf_counter() - started))
@@ -90,7 +122,8 @@ def main(argv=None):
     parser = argparse.ArgumentParser(
         prog="cli.serve", description="Moteur resident pour l'interface web")
     parser.add_argument("-p", "--port", type=int, default=8765)
-    # the loopback, tihs only ever speaks to a front running on the same machine
+    # the loopback, tihs only ever speaks to a front running on the same machine and
+    # never to a seperate host
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--no-warm", action="store_true",
                         help="ne pas precharger les index au demarrage")

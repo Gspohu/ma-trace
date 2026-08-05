@@ -8,11 +8,13 @@ version = "0.2.0"
 description = "Traceur de randonnee qui route en privilegiant l'ombre"
 requires-python = ">=3.10"
 
-# routing only needs these two, they cover overpass, the elevation api and the
-# forest geometry. Everything else stays optional
+# routing needs these, they cover overpass, the elevation api and the forest
+# geometry. defusedxml reads the gpx a walker uploads, where the stdlib parser
+# would expand an internal entity for them. Everything else stays optional
 dependencies = [
     "requests>=2.28",
     "shapely>=2.0",
+    "defusedxml>=0.7",
 ]
 
 [project.optional-dependencies]

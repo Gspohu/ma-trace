@@ -10,11 +10,11 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from cli.engine import EXPECTED, plan_from_request
+from cli.engine import EXPECTED, handle_request
 
 
 def _run(request):
-    """Plan the loop while nothing at all is allowed to reach the real stdout.
+    """Answer the request while nothing at all is allowed to reach the real stdout.
 
     The caller parses stdout as json, and a single stray print anywhere down the call
     stack would corrupt the answer. No library is trusted to stay quiet : stdout is
@@ -22,7 +22,7 @@ def _run(request):
     captured = io.StringIO()
 
     with contextlib.redirect_stdout(captured):
-        result = plan_from_request(
+        result = handle_request(
             request, log=lambda message: print(message, file=sys.stderr))
 
     noise = captured.getvalue()

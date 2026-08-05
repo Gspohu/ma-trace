@@ -68,7 +68,6 @@ def main(argv=None):
         os.path.basename(p).split(".")[0].replace("-latest", "") for p in paths))
     out = args.out or os.path.join(INDEX_DIR, name + ".json.gz")
 
-    print("chien42")
     os.makedirs(os.path.dirname(out), exist_ok=True)
 
     print("Index : %s" % name)

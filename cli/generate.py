@@ -10,7 +10,8 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core import plan
-from core.pipeline import DEFAULT_ROAD_PENALTY, DEFAULT_SUN_PENALTY
+from core.graph import DEFAULT_MAX_SAC
+from core.pipeline import DEFAULT_PACE_FACTOR, DEFAULT_ROAD_PENALTY, DEFAULT_SUN_PENALTY
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PRESETS = os.path.join(ROOT, "data", "presets.json")
@@ -54,9 +55,15 @@ def build_parser():
                         help="cout d'un metre au soleil, en metres equivalents")
     parser.add_argument("--road-penalty", type=float, default=DEFAULT_ROAD_PENALTY,
                         help="surcout supplementaire du bitume")
+    parser.add_argument("--pace-factor", type=float, default=DEFAULT_PACE_FACTOR,
+                        help="allure personnelle, au-dessus de 1 si vous marchez moins vite")
+    parser.add_argument("--max-sac", type=int, default=DEFAULT_MAX_SAC, choices=range(1, 7),
+                        help="difficulte maximale acceptee, echelle T1 a T6 du CAS")
     parser.add_argument("--no-loop", action="store_true", help="ne pas refermer la boucle")
     parser.add_argument("--no-elevation", action="store_true",
                         help="sauter l'altimetrie, bien plus rapide")
+    parser.add_argument("--no-landmarks", action="store_true",
+                        help="sauter les reperes, un appel Overpass de moins")
     parser.add_argument("--list-presets", action="store_true")
     return parser
 
@@ -80,7 +87,10 @@ def main(argv=None):
         sun_penalty=args.sun_penalty,
         road_penalty=args.road_penalty,
         close_loop=not args.no_loop,
-        with_elevation=not args.no_elevation,  
+        with_elevation=not args.no_elevation,
+        with_landmarks=not args.no_landmarks,
+        pace_factor=args.pace_factor,
+        max_sac=args.max_sac,
     )
 
     gpx_path = args.out + ".gpx"
