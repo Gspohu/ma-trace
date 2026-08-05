@@ -107,11 +107,20 @@ def test_a_repeated_point_is_asked_for_once(cache, monkeypatch):
     monkeypatch.setattr(elevation, "fetch", counter)
 
     doubled = [(49.0, 7.5), (49.001, 7.5), (49.0, 7.5)]
-    print("le chien")
     heights = elevation.sample(doubled, log=lambda m: None, cache=cache)
 
     assert len(counter.asked) == 2
     assert heights[0] == pytest.approx(heights[2])
+
+
+def test_a_broken_cache_never_stops_the_walk(cache, monkeypatch):
+    # a cache is an accelerator, losing it costs seconds and not the trace
+    counter = Counter()
+    monkeypatch.setattr(elevation, "fetch", counter)
+    cache.close()
+
+    heights = elevation.sample([(49.0, 7.5)], log=lambda m: None, cache=cache)
+    assert heights == pytest.approx([200.0])
 
 
 def test_the_order_of_the_answer_follows_the_tracé(cache, monkeypatch):

@@ -20,6 +20,10 @@ ENDPOINT = os.environ.get("ELEVATION_ENDPOINT", "https://api.opentopodata.org/v1
 BATCH = 100
 COOLDOWN = 1.1
 
+# TODO : eu-dem stops at the european border and a walk outside it comes back full of
+# holes, which raises without ever saying where. Opentopodata serves srtm and aster
+# worldwide on other endpoints, and ELEVATION_ENDPOINT already points anywhere
+
 # the tracé is walked on a constant step before anything is measured. Raw osm nodes
 # sit anywhere from under a metre to two hundred apart, which made every figure below
 # depend on how finely a mapper happened to draw that particular chemin
@@ -96,7 +100,13 @@ def sample(points, log=print, cache=False):
     if (cache is None):
         return fetch(points, log=log)
 
-    known = cache.lookup(points)
+    try:
+        known = cache.lookup(points)
+    except sqlite3.Error as exc:
+        # a cache is an accelerator, never a reason to refuse to draw a walk
+        log("   altimetrie : cache illisible (%s), tout part au reseau" % exc)
+        return fetch(points, log=log)
+
     missing = []
     seen = set()
 
@@ -110,7 +120,10 @@ def sample(points, log=print, cache=False):
         log("   altimetrie : %d points a recuperer, %d deja connus"
             % (len(missing), len(points) - len(missing)))
         fresh = fetch(missing, log=log)
-        cache.store(zip(missing, fresh))
+        try:
+            cache.store(zip(missing, fresh))
+        except sqlite3.Error as exc:
+            log("   altimetrie : cache non ecrit (%s), on continue sans" % exc)
         known.update({dem_cache.key(p): h for p, h in zip(missing, fresh)})
     else:
         log("   altimetrie : %d points, tous en cache" % len(points))
@@ -158,7 +171,10 @@ def climb(heights, threshold=CLIMB_THRESHOLD):
     The reference has to follow the local extreme, not whichever height last cleared
     the floor. Anchoring it on the sample itself loses the top of each rise, and that
     loss is systematic : measured against real vosges profiles it shaved seven percent
-    off, and it broke the one identity a closed loop must satisfy, D+ equal to D-"""
+    off, and it broke the one identity a closed loop must satisfy, D+ equal to D-.
+
+    Both ends of the last leg are flushed, which makes up minus down land on the height
+    difference of the profile exactly, and D+ equal D- on a loop that comes back home"""
     if (len(heights) < 2):
         return 0.0, 0.0
 
@@ -189,11 +205,17 @@ def climb(heights, threshold=CLIMB_THRESHOLD):
                 down += pivot - extreme
                 pivot, extreme, rising = extreme, height, True
 
-    # the leg still in progress hwen the walk ends counts too
+    # the leg still in progress hwen the walk ends counts too, together with the tail
+    # hanging past its turning point. Leaving that tail out is what broke D+ = D- :
+    # [10, 8, 11, 10] came back as 3 up against 2 down, the last metre of descent
+    # sitting under the threshold and never being versed
+    last = heights[-1]
     if (rising is True):
         up += max(0.0, extreme - pivot)
+        down += max(0.0, extreme - last)
     elif (rising is False):
         down += max(0.0, pivot - extreme)
+        up += max(0.0, last - extreme)
 
     return up, down
 

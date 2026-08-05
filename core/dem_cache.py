@@ -35,7 +35,10 @@ class Cache:
         if (folder):
             os.makedirs(folder, exist_ok=True)  
 
-        self._link = sqlite3.connect(path)
+        # two traces landing at once must queue on the write lock, not explode. Wal
+        # serves reads during someone else's write
+        self._link = sqlite3.connect(path, timeout=30.0)
+        self._link.execute("PRAGMA journal_mode=WAL")
         self._link.execute(SCHEMA)
         self._link.commit()
 

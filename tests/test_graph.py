@@ -34,13 +34,15 @@ class TestAccess:
     def test_a_motorway_is_never_walkable(self):
         assert is_walkable({"highway": "motorway"}) is False
 
+    def test_use_sidepath_keeps_walkers_off_the_carriageway(self):
+        # the compulsory parallel chemin is mapped as its own way
+        assert is_walkable({"highway": "secondary", "foot": "use_sidepath"}) is False
+
     def test_something_that_is_not_a_road_at_all(self):
         assert is_walkable({"building": "yes"}) is False
 
 
 class TestPricing:
-    # metres in, metres inflated by exposure out
-
     def test_sun_costs_more_than_shade(self, two_ways, northern_wood):
         graph = Graph(two_ways, Canopy(northern_wood), sun_penalty=4.0, road_penalty=1.0)
 

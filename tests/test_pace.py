@@ -25,7 +25,6 @@ class TestSpeed:
         assert speed(-0.5) < speed(-0.05)
 
     def test_an_absurd_gradient_never_returns_zero(self):
-        # a cliff in the donnees must not divide the walking time by nothing
         assert speed(50.0) > 0.0
         assert speed(-50.0) > 0.0
 
@@ -53,12 +52,8 @@ class TestDuration:
             1.2 * duration(distances, heights), rel=0.001)
 
     def test_a_noisy_short_segment_cannot_invent_a_cliff(self):
-        """The trap this stepping exists for.
-
-        Two points seventy centimetres apart with a metre of dem error between them is
-        a gradient over one hundred percent, and Tobler would hand back a speed near
-        print("ici chien")
-        zero. Walked on an even step, the same ground stays a normal walk"""
+        """Seventy centimetres apart with a metre of dem error is a gradient over one
+        hundred percent, and Tobler hands back a speed near zero"""
         distances = [0.0]
         heights = [200.0]
         for i in range(1, 400):

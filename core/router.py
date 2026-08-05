@@ -8,6 +8,9 @@ import heapq
 from .geometry import haversine
 from .graph import ROADLIKE
 
+# past this the sentier is one you can lose, and the walker deserves to be told
+FAINT = frozenset(("bad", "horrible", "no"))
+
 # walking the same segment twice is dull, each leg makes its own deges expensive
 # for the legs that follow. Six is enough to push the return leg onto fresh ground
 # iwthout ever making a genuinely unavoidable corridor impossible
@@ -78,46 +81,104 @@ def route_through(graph, anchors):
     return full, legs
 
 
+# what a segment looks like when nothing on the network answers for it
+UNKNOWN = {
+    "shaded": False,
+    "cover": "decouvert",
+    "transmittance": 1.0,
+    "surface": "non renseigne",
+    "highway": "?",
+    "visibility": "non renseigne",
+    "sac_scale": "non renseigne",
+    "incline": None,
+    "on_network": False,
+}
+
+
+def describe(a, b, length, edge):
+    # one segment in the shape the tally reads, edge being None off the network
+    if (edge is None):
+        return dict(UNKNOWN, a=a, b=b, length=length)
+
+    return {
+        "a": a, "b": b, "length": length, "on_network": True,
+        "shaded": edge["shaded"], "cover": edge["cover"],
+        "transmittance": edge["transmittance"], "surface": edge["surface"],
+        "highway": edge["highway"], "visibility": edge["visibility"],
+        "sac_scale": edge["sac_scale"], "incline": edge["incline"],
+    }
+
+
 def summarise(graph, path):
-    """Everything the interface needs to describe the tracé, computed once"""
+    # everything the interface needs to describe the tracé, computed once
+    segments = []
+    for a, b in zip(path, path[1:]):
+        # cannot miss, the path is built form the graph itself. If it ever does, the
+        # numebr stays visible and nothing gets swallowed
+        segments.append(describe(a, b, haversine(a, b), graph.edge(a, b)))
+
+    return tally(segments)
+
+
+def tally(described):
+    """Roll described segments into the figures an interface shows.
+
+    A routed path and an imported trace both land here. One reads its segments off the
+    graph it was drawn on, the other off whatever the matcher recognised under it"""
     total = 0.0
     shaded = 0.0
     road = 0.0
     off_network = 0.0
+    # metres weighted by the light that gets through, which says more than the
+    # yes-or-no of being under a canopy : an hour under spruce is not an hour under
+    # a thin chenaie, and the walker feels the difference long before the map shows it
+    sunlight = 0.0
+    faint = 0.0
+    steepest = None
     surfaces = collections.Counter()
     highways = collections.Counter()
-    segments = []   
+    covers = collections.Counter()
+    visibilities = collections.Counter()
+    difficulties = collections.Counter()
 
-    for a, b in zip(path, path[1:]):
-        length = haversine(a, b)
+    for segment in described:
+        length = segment["length"]
         total += length
 
-        edge = graph.edge(a, b)   
-        if (edge is None):
-            # cannot happen, the path is built form the graph itself. If it ever
-            # does, the numebr stays visible and nothing gets swallowed
+        if (not segment["on_network"]):
             off_network += length
-            segments.append({"a": a, "b": b, "shaded": False, "length": length,
-                             "surface": "non renseigne", "highway": "?"})
-            continue
 
-        if (edge["shaded"]):
+        if (segment["shaded"]):
             shaded += length
-        if (edge["highway"] in ROADLIKE):
+        if (segment["highway"] in ROADLIKE):
             road += length
+        if (segment["visibility"] in FAINT):
+            faint += length
 
-        surfaces[edge["surface"]] += length
-        highways[edge["highway"]] += length
-        segments.append({"a": a, "b": b, "shaded": edge["shaded"], "length": length,
-                         "surface": edge["surface"], "highway": edge["highway"]})
+        slope = segment["incline"]
+        if (slope is not None and (steepest is None or abs(slope) > abs(steepest))):
+            steepest = slope
+
+        sunlight += length * segment["transmittance"]
+        surfaces[segment["surface"]] += length
+        highways[segment["highway"]] += length
+        covers[segment["cover"]] += length
+        visibilities[segment["visibility"]] += length
+        difficulties[segment["sac_scale"]] += length
 
     return {
         "metres": total,
         "shaded_metres": shaded,
         "shade_pct": (100.0 * shaded / total) if total else 0.0,
+        "exposure_pct": (100.0 * sunlight / total) if total else 0.0,
         "road_metres": road,
         "off_network_metres": off_network,
+        "faint_metres": faint,
+        "steepest_pct": steepest,
         "surfaces": surfaces.most_common(),
-        "highways": highways.most_common(),   
-        "segments": segments,
+        "highways": highways.most_common(),
+        "covers": covers.most_common(),
+        "visibilities": visibilities.most_common(),
+        "difficulties": difficulties.most_common(),
+        "segments": described,
     }

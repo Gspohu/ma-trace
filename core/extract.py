@@ -6,8 +6,8 @@ import gzip
 import json
 import os
 
-from . import library
-from .graph import WALKABLE     
+from . import landmarks, library
+from .graph import WALKABLE
 
 CANOPY_TAGS = (("landuse", "forest"), ("natural", "wood"))
 
@@ -25,6 +25,24 @@ def _hits(bbox, lats, lons):
         return False
     return not (max(lats) < bbox[0] or min(lats) > bbox[2]
                 or max(lons) < bbox[1] or min(lons) > bbox[3])
+
+
+def _area_centre(area):
+    """Middle of an area's outer rings, None when it carries no usable ring.
+
+    A lake or a car park only ever needs a point to aim at, and the centre of the
+    bounding box is close enough for that without dragging shapely into the indexer"""
+    lats = []
+    lons = []
+    for ring in area.outer_rings():
+        for node in ring:
+            lats.append(node.lat)
+            lons.append(node.lon)
+
+    if (not lats):
+        return None, None
+
+    return (min(lats) + max(lats)) / 2.0, (min(lons) + max(lons)) / 2.0
 
 
 def header_bbox(pbf_paths):
@@ -68,6 +86,7 @@ def build_index(pbf_paths, bbox, out_path, label=None, log=print):
 
     network = []
     canopy = []
+    reperes = []
 
     for path in pbf_paths:
         log("Lecture de %s..." % os.path.basename(path))
@@ -103,6 +122,11 @@ def build_index(pbf_paths, bbox, out_path, label=None, log=print):
             elif (obj.type_str() == "a"):
                 tags = dict(obj.tags)
                 if (not _tagged_canopy(tags)):
+                    # not wood, and a lake or a car park is still worth aiming at
+                    lat, lon = _area_centre(obj)
+                    repere = landmarks.describe(tags, lat, lon)
+                    if (repere is not None and _hits(bbox, [lat], [lon])):
+                        reperes.append(repere)
                     continue
 
                 members = []
@@ -125,13 +149,25 @@ def build_index(pbf_paths, bbox, out_path, label=None, log=print):
                 if (not members or not _hits(bbox, lats, lons)):
                     continue
 
-                canopy.append({"type": "relation", "id": obj.orig_id(), "members": members})
+                # the tags ride along, leaf_type prices how dark the stand really is
+                canopy.append({"type": "relation", "id": obj.orig_id(),
+                               "tags": tags, "members": members})
 
-        log("   %d chemins retenus, %d massifs cumules" % (seen_ways, len(canopy)))   
+            elif (obj.type_str() == "n"):
+                tags = dict(obj.tags)
+                if (not tags or not obj.location.valid()):
+                    continue
+
+                repere = landmarks.describe(tags, obj.location.lat, obj.location.lon)
+                if (repere is not None and _hits(bbox, [repere["lat"]], [repere["lon"]])):
+                    reperes.append(repere)
+
+        log("   %d chemins retenus, %d massifs cumules" % (seen_ways, len(canopy)))
         if (dropped):
             log("   %d chemins ecartes, coordonnees absentes de l'extrait" % dropped)
 
-    payload = {"bbox": list(bbox), "network": network, "canopy": canopy}
+    payload = {"bbox": list(bbox), "network": network, "canopy": canopy,
+               "landmarks": reperes}
 
 
     with gzip.open(out_path, "wt", encoding="utf-8") as handle:
@@ -141,8 +177,8 @@ def build_index(pbf_paths, bbox, out_path, label=None, log=print):
     library.write_meta(out_path, bbox, label=label)
 
     size = os.path.getsize(out_path) / 1048576.0
-    log("Index ecrit : %s (%.1f Mo, %d chemins, %d massifs)"
-        % (out_path, size, len(network), len(canopy)))
+    log("Index ecrit : %s (%.1f Mo, %d chemins, %d massifs, %d reperes)"
+        % (out_path, size, len(network), len(canopy), len(reperes)))
     return payload
 
 
@@ -156,6 +192,9 @@ class LocalSource:
         self.bbox = tuple(payload["bbox"])
         self._network = payload["network"]
         self._canopy = payload["canopy"]
+        # an index built before the reperes were collected simply has none, and still
+        # routes fine
+        self._landmarks = payload.get("landmarks") or []
 
     def covers(self, bbox):
         return (bbox[0] >= self.bbox[0] and bbox[1] >= self.bbox[1]
@@ -189,3 +228,15 @@ class LocalSource:
 
         log("   foret locale : %d massifs" % len(kept))
         return {"elements": kept}
+
+    def fetch_landmarks(self, bbox, log=print):
+        """The same shape overpass hands back, out of the index.
+
+        Both sources are picked between at runtime, and one of them missing a method
+        the other has is an AttributeError waiting for the day it gets called. An
+        index writen before a field existed hands out the modern record anyway,
+        with None where nobody ever said"""
+        kept = [dict({"fee": None, "drinkable": None}, **repere)
+                for repere in self._landmarks if landmarks.within(repere, bbox)]
+        log("   %d reperes locaux" % len(kept))
+        return kept

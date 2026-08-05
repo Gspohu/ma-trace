@@ -4,6 +4,7 @@
 
 import pytest
 
+from conftest import Shelf
 from core.pipeline import plan
 from core.router import NoRouteError
 
@@ -11,27 +12,13 @@ A = {"name": "Depart", "lat": 49.000, "lon": 7.500}
 B = {"name": "Arrivee", "lat": 49.000, "lon": 7.520}
 
 
-class Source:
-    # stands in for the local index and for overpass, obth answer htis same shape
-    def __init__(self, network, canopy):
-        self._network = network
-        self._canopy = canopy
-
-    def fetch_network(self, bbox, log=print):
-        return {"elements": self._network}
-
-
-    def fetch_canopy(self, bbox, log=print):
-        return {"elements": self._canopy}
-
-
 def quiet(message):
     return None
 
 
 @pytest.fixture
-def world(two_ways, northern_wood):
-    return Source(two_ways, northern_wood)
+def world(shelf):
+    return shelf
 
 
 def test_the_shaded_detour_is_preferred(world):
@@ -99,10 +86,10 @@ def test_two_islands_cannot_be_joined(northern_wood):
 
     with pytest.raises(NoRouteError):
         plan([A, B], close_loop=False, with_elevation=False, 
-             source=Source(far, northern_wood), log=quiet)
+             source=Shelf(far, northern_wood), log=quiet)
 
 
 def test_an_empty_network_is_refused(northern_wood):
     with pytest.raises(ValueError):
         plan([A, B], close_loop=False, with_elevation=False,
-             source=Source([], northern_wood), log=quiet)
+             source=Shelf([], northern_wood), log=quiet)

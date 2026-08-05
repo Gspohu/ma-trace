@@ -7,6 +7,8 @@ import time
 
 import requests
 
+from . import landmarks
+
 _DEFAULT_MIRRORS = (
     "https://overpass.kumi.systems/api/interpreter",  
     "https://overpass-api.de/api/interpreter",
@@ -53,7 +55,23 @@ def query(body, tries=3, timeout=240, log=print):
                 continue
 
             if (response.status_code == 200):
-                return response.json()
+                try:
+                    data = response.json()
+                except ValueError as exc:
+                    last = "%s : reponse illisible (%s)" % (url, exc)
+                    log("   miroir indisponible : %s" % last)
+                    continue
+
+                # a query that blows its budget still answers 200, with whatever
+                # was gathered so far and a remark saying so. Half a network routes
+                # a walker into a wall, it has to count as a mirror failure
+                remark = data.get("remark") or ""
+                if ("error" in remark or "timed out" in remark):
+                    last = "%s : %s" % (url, remark)
+                    log("   miroir indisponible : %s" % last)
+                    continue
+
+                return data
 
             last = "%s : HTTP %d" % (url, response.status_code)
             log("   miroir indisponible : %s" % last)
@@ -80,12 +98,14 @@ def fetch_canopy(bbox, log=print):
     """Forest and wood polygons, relations included, they carry the clairieres as inner rings"""
     log("   couvert forestier...")
     box = _bbox(bbox)
+    # tags are asked for, not only the geometry : leaf_type is what separates a spruce
+    # plantation from a chenaie claire, and the two do not shelter a walker the same
     body = ("[out:json][timeout:240];("
             'way(%s)["landuse"="forest"];'
             'way(%s)["natural"="wood"];'
             'rel(%s)["landuse"="forest"];'
             'rel(%s)["natural"="wood"];'
-            ");out geom;" % (box, box, box, box))
+            ");out geom tags;" % (box, box, box, box))
     data = query(body, log=log)
     log("   %d polygones" % len(data["elements"]))
     return data
@@ -95,37 +115,20 @@ def fetch_landmarks(bbox, log=print):
     """Castles, water, rocks and parkings, the things worth routing through"""
     log("   points remarquables...")
     box = _bbox(bbox)
-    body = ("[out:json][timeout:180];("
-            'nwr(%s)["historic"="castle"];'
-            'nwr(%s)["natural"="water"];'
-            'nwr(%s)["natural"="rock"];'
-            'nwr(%s)["amenity"="parking"];'
-            ");out center tags;" % (box, box, box, box))
-    data = query(body, log=log)
+    clauses = "".join('nwr(%s)["%s"="%s"];' % (box, key, value)
+                      for key, value, _ in landmarks.LANDMARK_TAGS)
+    data = query("[out:json][timeout:180];(%s);out center tags;" % clauses, log=log)
 
     out = []
     for element in data["elements"]:
-        tags = element.get("tags", {})
-        lat = element.get("lat") or element.get("center", {}).get("lat")
-        lon = element.get("lon") or element.get("center", {}).get("lon")
-        if (lat is None or lon is None):
-            continue
+        centre = element.get("center") or {}
+        # tested against None and never for truth, a latitude of zero is the equator
+        lat = element["lat"] if ("lat" in element) else centre.get("lat")
+        lon = element["lon"] if ("lon" in element) else centre.get("lon")
 
-        kind = "parking"
-        if (tags.get("historic") == "castle"):
-            kind = "castle"
-        elif (tags.get("natural") == "water"):
-            kind = "water"
-        elif (tags.get("natural") == "rock"):
-            kind = "rock"
-
-        out.append({
-            "name": tags.get("name") or "",
-            "kind": kind,
-            "lat": lat,
-            "lon": lon,
-            "fee": tags.get("fee"),
-        })
+        repere = landmarks.describe(element.get("tags", {}), lat, lon)
+        if (repere is not None):
+            out.append(repere)
 
     log("   %d reperes" % len(out))
     return out

@@ -37,9 +37,8 @@ def test_wobble_under_the_threshold_never_banks():
 
 
 def test_smoothing_is_what_keeps_flat_ground_flat():
-    """Fed raw samples, a flat walk under eu-dem grade noise reports thousands of
-    metres of climb nobody walked. The noise here is drawn per point, harsher than
-    reality where dem error is correlated over neighbouring cells"""
+    # raw, a flat walk under eu-dem grade noise reports thousands of metres nobody
+    # walked. Drawn per point here, harsher than a dem whose error is correlated
     noise = random.Random(42)
     flat = [300.0 + noise.gauss(0, 7.0) for _ in range(600)]
 
@@ -95,9 +94,7 @@ def test_smoothing_leaves_a_flat_profile_alone():
 
 
 def test_a_closed_loop_climbs_exactly_what_it_drops():
-    """Come back where you started and the ascent has to equal the descent.
-
-    Anchoring on the last sample instead of the turning point broke this identity"""
+    # anchoring on the last sample once broke this identity, the turning point holds it
     noise = random.Random(3)
     out = [200.0]
     for _ in range(300):
@@ -131,5 +128,33 @@ def test_ascent_minus_descent_is_the_net_change():
     up, down = climb(walk)
     net = walk[-1] - walk[0]
 
-    # only the wobble left hangng under the floor may go missing, nevr a whole leg
-    assert up - down == pytest.approx(net, abs=2 * CLIMB_THRESHOLD)
+    # exact since both ends of the last leg are flushed, the old tolerence of two
+    # thresholds was wide enough to hide the drift
+    assert up - down == pytest.approx(net, abs=0.01)
+
+
+def test_a_loop_that_is_not_a_palindrome_still_balances():
+    up, down = climb([10.0, 8.0, 11.0, 10.0])
+
+    assert up == pytest.approx(3.0, abs=0.01)
+    assert down == pytest.approx(3.0, abs=0.01)
+
+
+def test_the_tail_under_the_floor_is_not_lost_at_either_end():
+    up, down = climb([10.0, 12.0, 9.0, 10.0])
+    assert up - down == pytest.approx(0.0, abs=0.01)
+
+
+def test_no_closed_loop_drifts_whatever_its_shape():
+    noise = random.Random(12)
+
+    for _ in range(200):
+        walk = [300.0]
+        for _ in range(noise.randint(40, 300)):
+            walk.append(walk[-1] + noise.gauss(0, 1.2))
+
+        drift = walk[-1] - walk[0]
+        closed = [h - drift * i / (len(walk) - 1) for i, h in enumerate(walk)]
+
+        up, down = climb(closed)
+        assert up == pytest.approx(down, abs=0.01)

@@ -2,6 +2,6 @@
 # -*- coding: utf-8 -*-
 """Shade weighted hiking router : pure domain logic, no interface in sight"""
 
-from .pipeline import plan
+from .pipeline import analyse, plan
 
-__all__ = ["plan"]
+__all__ = ["analyse", "plan"]

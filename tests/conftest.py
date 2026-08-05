@@ -28,13 +28,34 @@ def way(identifier, points, **tags):
     }
 
 
+class Shelf:
+    """Stands in for the local index and for overpass, all three calls or none"""
+
+    def __init__(self, network, canopy, landmarks=()):
+        self._network = network
+        self._canopy = canopy
+        self._landmarks = list(landmarks)
+
+    def fetch_network(self, bbox, log=print):
+        return {"elements": self._network}
+
+    def fetch_canopy(self, bbox, log=print):
+        return {"elements": self._canopy}
+
+    def fetch_landmarks(self, bbox, log=print):
+        return self._landmarks
+
+
+@pytest.fixture
+def shelf(two_ways, northern_wood):
+    return Shelf(two_ways, northern_wood)
+
+
 @pytest.fixture
 def two_ways():
-    """Two routes from the same A to the same B.
+    """Same A to the same B, one straight in full sun, one detouring under the trees.
 
-    The southern one is a straight line and takes full sun. The northern one detours
-    and hides under the trees. Which one wins is entirely decided by the sun penalty,
-    and that is the whole point of this projet"""
+    Which of them wins is decided by the sun penalty alone, the point of this projet"""
     return [
         way(1, [(SOUTH, WEST), (SOUTH, 7.510), (SOUTH, EAST)]),
         way(2, [(SOUTH, WEST), (NORTH, WEST), (NORTH, 7.510),

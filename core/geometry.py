@@ -41,6 +41,31 @@ def bbox_of(points, pad_metres=2500.0):
     return (min(lats) - dlat, min(lons) - dlon, max(lats) + dlat, max(lons) + dlon)
 
 
+def point_to_segment(p, a, b):
+    """Metres from p to the segment ab, the three of them as (lat, lon).
+
+    A local equirectangular frame centred on p. Over the few hundred metres this is
+    ever asked about the error stays well under the metre, and the great circle cross
+    track it replaces costs trigonometry nobody would notice the absence of"""
+    scale = math.cos(math.radians(p[0]))
+
+    def flat(q):
+        return ((q[1] - p[1]) * 111320.0 * scale, (q[0] - p[0]) * 111132.0)
+
+    ax, ay = flat(a)
+    bx, by = flat(b)
+    dx, dy = bx - ax, by - ay
+
+    span = dx * dx + dy * dy
+    if (span <= 0.0):
+        return math.hypot(ax, ay)
+
+    # p sits at the origin of that frame, projecting it onto ab is one dot product
+    t = -(ax * dx + ay * dy) / span
+    t = max(0.0, min(1.0, t))
+    return math.hypot(ax + t * dx, ay + t * dy)
+
+
 def path_length(points):
     """Cumulated lenght of a polyline given as (lat, lon) pairs"""
     total = 0.0
