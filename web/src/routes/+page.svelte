@@ -5,18 +5,19 @@
     import StatGrid from "$lib/components/StatGrid.svelte";
     import SurfaceMix from "$lib/components/SurfaceMix.svelte";
     import ElevationProfile from "$lib/components/ElevationProfile.svelte";
-    import type { PageData } from "./$types";
+    import { ask } from "$lib/core/engine";
+    import { presets } from "$lib/core/presets";
     import type { ColourMode, Route, Waypoint } from "$lib/core/types";
-
-
-    let { data }: { data: PageData } = $props();
 
     let waypoints = $state<Waypoint[]>([]);
     let sunPenalty = $state(4);
     let roadPenalty = $state(2.2);
     let paceFactor = $state(1);
     let maxSac = $state(2);
-    let withElevation = $state(true);
+
+    // no terrain model a browser can reach, and the panel says as much where the two
+    // missing figures would sit
+    const withElevation = false;
     let showCanopy = $state(false);
     let showLandmarks = $state(false);
     let mode = $state<ColourMode>("exposure");
@@ -26,6 +27,10 @@
     let hovered = $state<number | null>(null); 
     let busy = $state(false);
     let failure = $state<string | null>(null);
+
+    // the engine takes its time on the first trace, it has an interpreter to start and
+    // a network to fetch. Saying where it is beats a spinner that could mean anything
+    let progress = $state<string | null>(null);
 
 
     // an ojbect url is a resource, not a value. A plain $derived would mint a fresh one
@@ -95,36 +100,14 @@
 
         try
         {
-            const response = await fetch("/api/route", {
-                method: "POST",
-                headers: { "content-type": "application/json" },
-                body: JSON.stringify(payload)
-            });
-
-
-            if (!response.ok)
+            route = (await ask(payload, (stage, detail) =>
             {
-                // sveltekit wraps endpoint errors as {"message": ...}, the walker
-                // should read the message and never the json around it
-                const raw = await response.text();
-                try
-                {
-                    failure = (JSON.parse(raw) as { message?: string }).message ?? raw;
-                }
-                catch
-                {
-                    failure = raw;
-                }
-                route = null;
-                return;
-            }
-
-
-            route = (await response.json()) as Route;
+                progress = detail ?? stage;
+            })) as Route;
         }
         catch (cause)
         {
-            failure = cause instanceof Error ? cause.message : "le moteur est injoignable";
+            failure = cause instanceof Error ? cause.message : "le moteur a renonce";
             route = null;
         }
         finally
@@ -141,13 +124,12 @@
 <main>
     <div class="grid">
         <RoutePanel
-            presets={data.presets}
+            {presets}
             bind:waypoints
             bind:sunPenalty
             bind:roadPenalty
             bind:paceFactor
             bind:maxSac
-            bind:withElevation
             {busy}
             onsubmit={trace}
             onimport={importTrace}
@@ -162,13 +144,26 @@
             {/if}
 
 
+            {#if busy && progress}
+                <p class="progress">{progress}</p>
+            {/if}
+
             {#if failure}
                 <p class="failure">{failure}</p>
             {/if}
 
             {#if route}
                 <StatGrid stats={route.stats} />
-                <ElevationProfile {route} {hovered} onhover={(i) => (hovered = i)} />
+                {#if route.stats.has_elevation}
+                    <ElevationProfile {route} {hovered} onhover={(i) => (hovered = i)} />
+                {:else}
+                    <p class="missing">
+                        Pas de dénivelé ni de durée : ils demandent un modèle de terrain
+                        qu'un navigateur ne peut pas atteindre. Les modèles ouverts
+                        mesurent la cime des arbres, ce qui majore le D+ de moitié sous
+                        couvert. <code>python3 -m cli.generate</code> les calcule.
+                    </p>
+                {/if}
 
                 <div class="tail">   
                     <SurfaceMix {route} />
@@ -194,10 +189,12 @@
                                 <strong>L'ombre est une approximation</strong>
                                 <span>Elle vient des polygones forestiers d'OSM, pas d'une densité de canopée ni de la course du soleil. Une futaie et une coupe rase comptent pareil.</span>
                             </li>
-                            <li>
-                                <strong>Le dénivelé est estimé</strong>
-                                <span>Modèle de terrain EU-DEM 25 m, dont la précision se dégrade justement sous couvert dense et en forte pente, là où ce tracé vous emmène. Comptez une marge de l'ordre de 10 %.</span>
-                            </li>
+                            {#if route.stats.has_elevation}
+                                <li>
+                                    <strong>Le dénivelé est estimé</strong>
+                                    <span>Modèle de terrain EU-DEM 25 m, dont la précision se dégrade justement sous couvert dense et en forte pente, là où ce tracé vous emmène. Comptez une marge de l'ordre de 10 %.</span>
+                                </li>
+                            {/if}
                             <li>
                                 <strong>Graphe</strong>
                                 <span>{route.stats.nodes.toLocaleString("fr-FR")} nœuds, {route.stats.edges.toLocaleString("fr-FR")} arêtes, {route.stats.clearings} clairières découpées dans la canopée.</span>
@@ -359,6 +356,35 @@
         background: var(--colour-danger-muted);
         border-radius: var(--radius-md);
         font-size: var(--font-size-sm);
-        color: var(--colour-text-primary); 
+        color: var(--colour-text-primary);
+    }
+
+    .progress
+    {
+        margin: 0;
+        padding: var(--spacing-base);
+        border-left: var(--border-width-thick) solid var(--colour-accent);
+        background: var(--colour-bg-surface-raised);
+        border-radius: var(--radius-md);
+        font-size: var(--font-size-sm);
+        color: var(--colour-text-secondary);
+    }
+
+    .missing
+    {
+        margin: 0;
+        padding: var(--spacing-base);
+        background: var(--colour-bg-surface-raised);
+        border-radius: var(--radius-md);
+        font-size: var(--font-size-sm);
+        line-height: var(--line-height-relaxed);
+        color: var(--colour-text-secondary);
+    }
+
+    .missing code
+    {
+        font-family: var(--font-mono);
+        font-size: var(--font-size-xs);
+        color: var(--colour-text-primary);
     }
 </style>

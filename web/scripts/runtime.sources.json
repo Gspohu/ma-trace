@@ -1,0 +1,23 @@
+{
+  "version": "0.28.1",
+  "distribution": "https://cdn.jsdelivr.net/pyodide/v0.28.1/full/",
+  "runtime": [
+    "pyodide.mjs",
+    "pyodide.asm.js",
+    "pyodide.asm.wasm",
+    "pyodide-lock.json",
+    "python_stdlib.zip",
+    "shapely-2.0.7-cp313-cp313-pyodide_2025_0_wasm32.whl",
+    "numpy-2.2.5-cp313-cp313-pyodide_2025_0_wasm32.whl",
+    "requests-2.32.4-py3-none-any.whl",
+    "urllib3-2.5.0-py3-none-any.whl",
+    "certifi-2025.7.14-py3-none-any.whl",
+    "idna-3.10-py3-none-any.whl",
+    "charset_normalizer-3.4.2-py3-none-any.whl",
+    "micropip-0.10.1-py3-none-any.whl",
+    "packaging-24.2-py3-none-any.whl"
+  ],
+  "elsewhere": {
+    "defusedxml-0.7.1-py2.py3-none-any.whl": "https://files.pythonhosted.org/packages/07/6c/aa3f2f849e01cb6a001cd8554a88d4c77c5c1a31c95bdf1cf9301e6d9ef4/defusedxml-0.7.1-py2.py3-none-any.whl"
+  }
+}

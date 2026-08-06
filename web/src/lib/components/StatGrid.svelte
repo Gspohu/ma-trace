@@ -20,14 +20,22 @@
     }
 
 
+    // denivele and duration only exist when the ground was measured, and both are
+    // dropped rather than shown at zero when it was not
     const figures = $derived<Figure[]>([
         { label: "Distance", value: decimal(stats.km, 2), unit: "km", tone: "plain" },
         { label: "Sous couvert", value: decimal(stats.shade_pct, 1), unit: "%", tone: "shade" },
         { label: "Exposition", value: decimal(stats.exposure_pct, 1), unit: "%", tone: "sun" },
         { label: "Au soleil", value: integer(stats.sun_metres), unit: "m", tone: "sun" },
-        { label: "Denivele", value: "+" + integer(stats.up), unit: "m", tone: "plain" },
+        ...(stats.has_elevation
+            ? [{ label: "Denivele", value: "+" + integer(stats.up), unit: "m",
+                 tone: "plain" as const }]
+            : []),
         { label: "Sur route", value: integer(stats.road_metres), unit: "m", tone: "plain" },
-        { label: "Temps estime", value: hoursAndMinutes(stats.hours), unit: "", tone: "plain" }
+        ...(stats.has_elevation
+            ? [{ label: "Temps estime", value: hoursAndMinutes(stats.hours), unit: "",
+                 tone: "plain" as const }]
+            : [])
     ]);
 </script>
 

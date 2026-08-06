@@ -1,0 +1,15 @@
+{
+  "version": "0.28.1",
+  "wheels": [
+    "certifi-2025.7.14-py3-none-any.whl",
+    "charset_normalizer-3.4.2-py3-none-any.whl",
+    "defusedxml-0.7.1-py2.py3-none-any.whl",
+    "idna-3.10-py3-none-any.whl",
+    "micropip-0.10.1-py3-none-any.whl",
+    "numpy-2.2.5-cp313-cp313-pyodide_2025_0_wasm32.whl",
+    "packaging-24.2-py3-none-any.whl",
+    "requests-2.32.4-py3-none-any.whl",
+    "shapely-2.0.7-cp313-cp313-pyodide_2025_0_wasm32.whl",
+    "urllib3-2.5.0-py3-none-any.whl"
+  ]
+}

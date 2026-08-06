@@ -1,6 +1,9 @@
-import adapter from '@sveltejs/adapter-node';
-import { sveltekit } from '@sveltejs/kit/vite'; 
+import adapter from '@sveltejs/adapter-static';
+import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
+
+// pages serves the site under the repository name, and nothing at the root
+const BASE = (process.env.BASE_PATH ?? '') as '' | `/${string}`;
 
 export default defineConfig({
 	plugins: [
@@ -11,8 +14,10 @@ export default defineConfig({
 					filename.split(/[/\\]/).includes('node_modules') ? undefined : true
 			},
 
-			// node adapter, the routing engine is spanwed as a child process at runtime
-			adapter: adapter()
-		}) 
+			// nothing runs on a server any more, the engine boots inside the browser
+			adapter: adapter({ fallback: '404.html' }),
+			paths: { base: BASE, relative: false },
+			prerender: { entries: ['*'] }
+		})
 	]
 });

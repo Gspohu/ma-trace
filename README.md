@@ -91,6 +91,25 @@ entièrement la sortie, et repasse par Overpass quand aucun ne convient.
 python3 -m cli.build_index --list
 ```
 
+## Le même moteur dans un navigateur
+
+Le site publié fait tourner `core/` tel quel, compilé en WebAssembly, sans rien à
+installer et sans serveur derrière. Le réseau et le couvert viennent d'Overpass, le
+Dijkstra tourne dans un worker, et le GPX se télécharge à la fin. C'est le même code
+qu'en ligne de commande, monté dans un système de fichiers virtuel : deux
+implémentations qui divergent sont exactement ce qu'on voulait éviter.
+
+Une chose y manque, et c'est délibéré : **ni dénivelé ni durée**. Les deux demandent un
+modèle de terrain, et aucun de ceux qu'un navigateur peut interroger n'en est un. Ceux
+qui sont ouverts mesurent la cime des arbres, pas le sol. Mesuré sur une boucle des
+Vosges du Nord, le D+ passait de 293 à 480 m, et l'erreur grandit à mesure que le
+routeur réussit à passer sous le couvert. Un chiffre faux vaut moins que pas de
+chiffre, donc l'interface le dit et renvoie à la ligne de commande.
+
+```bash
+cd web && npm run build    # recupere le runtime, recopie core/ et cli/, construit
+```
+
 ## Tracer une boucle
 
 L'interface web, où les points de passage se posent au clic sur la carte : 

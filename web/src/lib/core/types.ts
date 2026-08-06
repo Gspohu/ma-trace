@@ -50,6 +50,8 @@ export interface RouteStats
     faint_metres: number;
     steepest_pct: number | null;
     max_sac: number;
+    // false when nothing measured the ground, which leaves up, down and hours at zero
+    has_elevation: boolean;
     up: number;
     down: number;
     // tobler, walked at pace_factor. Both come from core, never recomputed here

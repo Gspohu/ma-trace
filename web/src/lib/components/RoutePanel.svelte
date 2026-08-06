@@ -11,7 +11,6 @@
         roadPenalty: number;
         paceFactor: number;
         maxSac: number;
-        withElevation: boolean;
         busy: boolean;
         onsubmit: () => void;
         onimport: (document: string) => void;
@@ -27,7 +26,6 @@
         roadPenalty = $bindable(),
         paceFactor = $bindable(),
         maxSac = $bindable(),
-        withElevation = $bindable(),
         busy,
         onsubmit,
         onimport
@@ -157,15 +155,6 @@
             <b>&times;{roadPenalty}</b>
         </label>
 
-        <!-- TODO the walker sets this by hand while pace.calibrate already knows how to
-             read it off past outings, nothing records them yet -->
-        <label class="slider">
-            <span>Allure</span>
-            <input type="range" min="0.6" max="2" step="0.05" bind:value={paceFactor} disabled={busy} />
-            <b>&times;{decimal(paceFactor, 2)}</b>
-        </label>
-        <p class="hint">Au-dessus de 1 si vous marchez moins vite que la référence, qui ne compte aucune pause.</p>
-
         <label class="slider">
             <span>Difficulté maximale</span>
             <input type="range" min="1" max="6" step="1" bind:value={maxSac} disabled={busy} />
@@ -173,10 +162,6 @@
         </label>
         <p class="hint">{sacLabel}. Les chemins que l'OSM annonce au-dessus sont écartés du tracé.</p>
 
-        <label class="check">
-            <input type="checkbox" bind:checked={withElevation} disabled={busy} />
-            <span>Altimétrie <small>(plus lent, une seconde par centaine de points)</small></span>
-        </label>
     </section>
 
     <button type="button" class="go" onclick={onsubmit} disabled={!ready}>
@@ -194,7 +179,7 @@
                    disabled={busy} />
             <span>Ouvrir un GPX</span>
         </label>
-        <p class="hint">Ombre, revêtements et dénivelé d'une trace déjà tracée, la vôtre ou celle d'un autre.</p>
+        <p class="hint">Ombre et revêtements d'une trace déjà tracée, la vôtre ou celle d'un autre.</p>
     </section>
 </aside>
 
@@ -442,24 +427,6 @@
         font-variant-numeric: tabular-nums;
         color: var(--colour-text-primary);
     }
-
-
-    .check
-    {
-        display: flex;
-        align-items: flex-start;
-        gap: var(--spacing-md);
-        margin-top: var(--spacing-md);
-        font-size: var(--font-size-sm);
-        color: var(--colour-text-secondary);
-    }
-
-
-    .check input
-    {
-        margin-top: 0.25rem;
-        accent-color: var(--colour-accent);
-    } 
 
 
     .go
