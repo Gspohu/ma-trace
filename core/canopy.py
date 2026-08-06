@@ -4,6 +4,7 @@
 
 import collections
 
+import shapely
 from shapely.errors import GEOSException, TopologicalError
 from shapely.geometry import Polygon, MultiPolygon, LineString
 from shapely.ops import unary_union
@@ -64,20 +65,82 @@ def _leaf_kind(tags):
     return None
 
 
+# geos gives up on some overpass rings with a non noded intersection, two borders
+# crossing at a point neither of them carries. Overlaying on a fixed grid snaps the two
+# together and completes. A hundredth of a millimetre, chosen by measurement : on the
+# hanau loop it lands on the very shade figure the exact overlay gives, where 1e-9 cost
+# seven tenths of a point and 1e-12 cost two points
+_SNAP = 1e-10
+
+
+def _sound(shape):
+    """A geometry every later call can be trusted with.
+
+    An invalid union does not always throw where it is built. It throws much later,
+    inside an intersection or a simplify, and under wasm that lands as a runtime crash
+    rather than an exception anybody can catch"""
+    if (shape.is_valid):
+        return shape
+
+    return shapely.make_valid(shape)
+
+
+def _merge(polys):
+    """Union of the lot, on a fixed grid from the start.
+
+    The exact overlay throws on two rings meeting where neither carries a node, and it
+    throws from C++ : under wasm that is a runtime crash and not an exception anybody
+    gets to catch. Snapping first is what keeps geos from ever reaching that state"""
+    try:
+        return _sound(shapely.union_all(polys, grid_size=_SNAP))
+    except _BROKEN_RING:
+        return _sound(unary_union(polys))
+
+
+def _without(shape, holes):
+    if (holes is None):
+        return _sound(shape)
+
+    try:
+        return _sound(shapely.difference(shape, holes, grid_size=_SNAP))
+    except _BROKEN_RING:
+        return _sound(shape.difference(holes))
+
+
 def _ring_to_polygon(ring):
+    """One osm ring, made sound before it ever reaches an overlay.
+
+    Repairing here and not after the union is what matters : under wasm a geos
+    exception is a runtime crash, so a doubtful ring has to be squared away before
+    anything tries to overlay it, never rescued once it has thrown"""
     if (len(ring) < 4):
         return None
 
     try:
         poly = Polygon(ring)
         if (not poly.is_valid):
-            poly = poly.buffer(0)
+            # make_valid keeps the area a buffer(0) sometimes quietly drops, and it
+            # hands back a collection when the ring crosses itself
+            poly = _polygonal(shapely.make_valid(poly))
     except _BROKEN_RING:
         return None
 
-    if (poly.is_empty):
+    if (poly is None or poly.is_empty):
         return None
     return poly
+
+
+def _polygonal(shape):
+    """Only the polygons of whatever make_valid handed back, lines and points dropped"""
+    if (shape.geom_type in ("Polygon", "MultiPolygon")):
+        return shape
+
+    kept = [geom for geom in getattr(shape, "geoms", [])
+            if geom.geom_type in ("Polygon", "MultiPolygon")]
+    if (not kept):
+        return None
+
+    return unary_union(kept)
 
 
 class Canopy:
@@ -119,10 +182,9 @@ class Canopy:
                     outers.append(poly)
                     by_kind[kind].append(poly)
 
-        cover = unary_union(outers) if outers else Polygon()
-        clearings = unary_union(inners) if inners else None
-        if (clearings is not None):
-            cover = cover.difference(clearings)
+        cover = _merge(outers) if outers else Polygon()
+        clearings = _merge(inners) if inners else None
+        cover = _without(cover, clearings)
         if (isinstance(cover, Polygon)):
             cover = MultiPolygon([cover] if not cover.is_empty else [])
 
@@ -140,9 +202,7 @@ class Canopy:
             if (kind is None):
                 continue
 
-            shape = unary_union(polys)
-            if (clearings is not None):
-                shape = shape.difference(clearings)
+            shape = _without(_merge(polys), clearings)
             self._layers.append((TRANSMITTANCE[kind], kind, prep(shape)))
 
         self._layers.sort(key=lambda layer: layer[0])
@@ -173,7 +233,12 @@ class Canopy:
 
     def clipped_rings(self, bbox_shape, tolerance=0.00012):
         """Simplified outlines for drawing, in lat/lon, ready to be projected"""
-        clipped = self.shape.intersection(bbox_shape).simplify(tolerance)
+        try:
+            window = shapely.intersection(self.shape, bbox_shape, grid_size=_SNAP)
+        except _BROKEN_RING:
+            window = self.shape.intersection(bbox_shape)
+
+        clipped = _sound(window.simplify(tolerance))
         geoms = clipped.geoms if isinstance(clipped, MultiPolygon) else [clipped]
 
         rings = []

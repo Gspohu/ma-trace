@@ -2,8 +2,10 @@
 # -*- coding: utf-8 -*-
 """Forest assembly, where a forgotten hole once turned a car park into deep woods"""
 
+import shapely
 from shapely.geometry import box
 
+from core import canopy
 from core.canopy import DEFAULT_TRANSMITTANCE, FULL_SUN, TRANSMITTANCE, Canopy
 
 
@@ -125,3 +127,46 @@ def test_rings_come_back_clipped_for_drawing(northern_wood):
         for lat, lon in ring["outer"]:
             assert 48.9 < lat < 49.1
             assert 7.4 < lon < 7.6
+
+
+def test_a_massif_geos_refuses_exactly_is_still_merged(monkeypatch):
+    """The snapped union is tried first, and the exact one catches whatever it refuses"""
+    from shapely.errors import GEOSException
+
+    calls = {"exact": 0}
+    real = shapely.union_all
+
+    def refuses(polys, grid_size=None, **rest):
+        if (grid_size is None):
+            # what unary_union calls once the snapped attempt has given up
+            return real(polys, **rest)
+
+        calls["exact"] += 1
+        raise GEOSException("found non-noded intersection")
+
+    monkeypatch.setattr(canopy.shapely, "union_all", refuses)
+
+    wood = [{"type": "way", "id": 1, "tags": {"landuse": "forest"},
+             "geometry": [{"lat": 49.0, "lon": 7.5}, {"lat": 49.0, "lon": 7.6},
+                          {"lat": 49.1, "lon": 7.6}, {"lat": 49.1, "lon": 7.5},
+                          {"lat": 49.0, "lon": 7.5}]}]
+
+    cover = Canopy(wood)
+
+    assert calls["exact"] > 0
+    assert cover.outer_count == 1
+    assert cover.shape.area > 0.0
+
+
+def test_a_self_crossing_massif_comes_back_valid():
+    """Left invalid a bow tie throws much later, inside an intersection, where wasm
+    turns the C++ exception into a crash nobody can catch"""
+    bow = [{"type": "way", "id": 1, "tags": {"landuse": "forest"},
+            "geometry": [{"lat": 49.0, "lon": 7.5}, {"lat": 49.1, "lon": 7.6},
+                         {"lat": 49.0, "lon": 7.6}, {"lat": 49.1, "lon": 7.5},
+                         {"lat": 49.0, "lon": 7.5}]}]
+
+    cover = Canopy(bow)
+
+    assert cover.shape.is_valid
+    assert cover.clipped_rings(box(7.4, 48.9, 7.7, 49.2)) != []
