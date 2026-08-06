@@ -78,3 +78,29 @@ def test_nothing_is_matched_past_the_snapping_radius(northern_wood):
 
     beyond = INSIDE + (SNAP_RADIUS + 5.0) / 111132.0
     assert index.nearest((beyond, 7.505)) is None
+
+
+def test_tally_hands_back_every_figure_an_interface_reads(northern_wood):
+    """A matched trace and a routed one both land here, and a key growing on one side
+    only is how the two stop being comparable"""
+    index, canopy = built([way(1, INSIDE)], northern_wood)
+    described = match([(INSIDE, 7.501), (INSIDE, 7.509)], index, canopy)
+
+    figures = tally(described)
+    expected = {"covers", "difficulties", "exposure_pct", "faint_metres", "highways",
+                "metres", "road_metres", "segments", "shade_pct", "shaded_metres",
+                "steepest_pct", "surfaces", "visibilities", "off_network_metres"}
+
+    assert expected <= set(figures)
+    assert figures["metres"] > 0.0
+    assert len(figures["segments"]) == len(described)
+
+
+def test_a_described_segment_carries_the_whole_contract(northern_wood):
+    index, canopy = built([way(1, INSIDE)], northern_wood)
+    described = match([(INSIDE, 7.501), (INSIDE, 7.509)], index, canopy)
+
+    expected = {"a", "b", "cover", "incline", "length", "on_network", "sac_scale",
+                "shaded", "surface", "transmittance", "visibility", "highway"}
+
+    assert expected <= set(described[0])

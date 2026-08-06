@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """Gpx output, the one artefact that leaves the machine and lands on a gps"""
 
-import xml.etree.ElementTree as ET
+from defusedxml import ElementTree as ET
 
 import pytest
 

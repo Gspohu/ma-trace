@@ -2,10 +2,8 @@
 # -*- coding: utf-8 -*-
 """What counts as a landmark, and the record both sources hand back for one"""
 
-# Overpass and the local index each find these their own way, they must agree on what
-# they found. The three water kinds stay apart : a tap put there to drink from is not a
-# spring in the woods, and neither is an etang. Walking thirty minutes to a lake you
-# cannot drink is the kind of mistake this tells apart
+# the three water kinds stay apart : walking thirty minutes to a lake you cannot drink
+# is the mistake this tells apart
 LANDMARK_TAGS = (
     ("historic", "castle", "castle"),
     ("amenity", "drinking_water", "drinking_water"),
@@ -41,14 +39,12 @@ def describe(tags, lat, lon):
         "lat": lat,
         "lon": lon,
         "fee": tags.get("fee"),
-        # osm's own word on whether it is drinkable, and it is often silent. None means
-        # nobody said, which on a spring is a reason to carry the bottle full anyway
+        # None means nobody said, and on a spring that is a reason to carry a full one
         "drinkable": _drinkable(tags, kind),
     }
 
 
 def _drinkable(tags, kind):
-    """True, False or None when osm makes no claim either way"""
     stated = tags.get("drinking_water")
     if (stated in ("yes", "treated")):
         return True

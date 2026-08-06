@@ -5,11 +5,17 @@
 import pytest
 
 from conftest import Shelf
+from core import landmarks
+from core.canopy import Canopy
+from core.graph import Graph, node_key
 from core.pipeline import plan
-from core.router import NoRouteError
+from core.router import NoRouteError, describe
 
 A = {"name": "Depart", "lat": 49.000, "lon": 7.500}
 B = {"name": "Arrivee", "lat": 49.000, "lon": 7.520}
+
+NEAR = node_key(49.000, 7.500)
+FAR = node_key(49.000, 7.510)
 
 
 def quiet(message):
@@ -93,3 +99,26 @@ def test_an_empty_network_is_refused(northern_wood):
     with pytest.raises(ValueError):
         plan([A, B], close_loop=False, with_elevation=False,
              source=Shelf([], northern_wood), log=quiet)
+
+
+def test_a_described_segment_carries_its_whole_contract(two_ways, northern_wood):
+    """Both the router and the matcher fill this record, and a key appearing on one
+    side only is how a routed loop and an imported trace stop being comparable"""
+    expected = {"a", "b", "cover", "incline", "length", "on_network", "sac_scale",
+                "shaded", "surface", "transmittance", "visibility", "highway"}
+
+    graph = Graph(two_ways, Canopy(northern_wood), sun_penalty=4.0, road_penalty=1.0)
+    described = describe(NEAR, FAR, 120.0, graph.edge(NEAR, FAR))
+
+    assert expected <= set(described)
+
+
+def test_a_repere_carries_its_whole_contract():
+    """The local index and overpass both build one through landmarks.describe"""
+    repere = landmarks.describe({"amenity": "drinking_water", "name": "Source"},
+                                49.0, 7.5)
+
+    assert set(repere) == {"name", "kind", "lat", "lon", "fee", "drinkable"}
+    assert repere["kind"] == "drinking_water"
+    assert repere["drinkable"] is True
+    assert repere["fee"] is None

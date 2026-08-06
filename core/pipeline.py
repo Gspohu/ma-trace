@@ -256,6 +256,10 @@ def _present(name, stats, canopy, bbox, marks, reperes, graph, max_sac,
             "faint_metres": round(stats["faint_metres"]),
             "steepest_pct": stats["steepest_pct"],
             "max_sac": max_sac,
+            # whether the ground was actually measured. Without it every height sits at
+            # zero, and up, down and the tobler duration describe a flat walk nobody
+            # took. An interface has to know not to show them
+            "has_elevation": bool(with_elevation),
             "up": round(alti["up"]),
             "down": round(alti["down"]),
             "hours": round(hours, 3),

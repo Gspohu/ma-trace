@@ -74,3 +74,29 @@ def test_every_figure_the_interface_reads_is_present(shelf):
                 "up", "down", "hours", "pace_factor", "min_ele", "max_ele", "nodes",
                 "edges", "clearings"}
     assert expected <= set(result["stats"])
+
+
+def test_the_whole_payload_and_not_only_its_figures(shelf):
+    """One of them quietly going missing is how a panel goes blank"""
+    drawn = plan([WEST, EAST], source=shelf, with_elevation=False, log=quiet)
+
+    for key in ("bbox", "canopy", "highways", "landmarks", "seg_surface", "shade",
+                "points", "waypoints", "surfaces", "covers", "gpx", "name"):
+        assert key in drawn, key
+
+    assert set(drawn["bbox"]) == {"minlat", "minlon", "maxlat", "maxlon"}
+    assert len(drawn["shade"]) == len(drawn["seg_surface"])
+    assert len(drawn["shade"]) == len(drawn["points"]) - 1
+
+    read = analyse([(p["lat"], p["lon"]) for p in drawn["points"]],
+                   source=shelf, with_elevation=False, log=quiet)
+    assert set(read) == set(drawn)
+
+
+def test_a_run_without_the_ground_says_so(shelf):
+    """A D+ of zero on a real walk is a lie an interface would print without blinking"""
+    result = plan([WEST, EAST], source=shelf, with_elevation=False, log=quiet)
+    assert result["stats"]["has_elevation"] is False
+
+    measured = plan([WEST, EAST], source=shelf, with_elevation=True, log=quiet)
+    assert measured["stats"]["has_elevation"] is True
