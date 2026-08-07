@@ -2,8 +2,7 @@
 # -*- coding: utf-8 -*-
 """What counts as a landmark, and the record both sources hand back for one"""
 
-# the three water kinds stay apart : walking thirty minutes to a lake you cannot drink
-# is the mistake this tells apart
+# the water kinds stay apart : thirty minutes of marche to a lake you cannot drink
 LANDMARK_TAGS = (
     ("historic", "castle", "castle"),
     ("amenity", "drinking_water", "drinking_water"),
@@ -14,7 +13,6 @@ LANDMARK_TAGS = (
     ("amenity", "parking", "parking"),
 )
 
-# what you may actually fill a bottle from, whatever osm says about how sure it is
 WATER_KINDS = frozenset(("drinking_water", "spring", "well"))
 
 

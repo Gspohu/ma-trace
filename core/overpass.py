@@ -85,13 +85,87 @@ def _bbox(box):
     return "%.6f,%.6f,%.6f,%.6f" % (box[0], box[1], box[2], box[3])
 
 
-def fetch_network(bbox, log=print): 
+def fetch_network(bbox, log=print):
     """Every way a walker may legally use inside the box"""
     log("   reseau pietonnier...")
     body = "[out:json][timeout:240];way(%s)%s;out geom tags;" % (_bbox(bbox), NETWORK_FILTER)
     data = query(body, log=log)
     log("   %d chemins" % len(data["elements"]))
     return data
+
+
+def _network_clause(box):
+    return "way(%s)%s;" % (box, NETWORK_FILTER)
+
+
+def _canopy_clause(box):
+    return ('way(%s)["landuse"="forest"];'
+            'way(%s)["natural"="wood"];'
+            'rel(%s)["landuse"="forest"];'
+            'rel(%s)["natural"="wood"];' % (box, box, box, box))
+
+
+def _landmark_clause(box):
+    return "".join('nwr(%s)["%s"="%s"];' % (box, key, value)
+                   for key, value, _ in landmarks.LANDMARK_TAGS)
+
+
+def _sort_out(elements):
+    """Split one mixed answer back into the three sets that were asked for.
+
+    The three filters cannot select the same element : a way carrying highway is not
+    one carrying landuse, and no element holds two values of a single key"""
+    network = []
+    canopy = []
+    reperes = []
+
+    for element in elements:
+        tags = element.get("tags") or {}
+        if (tags.get("highway")):
+            network.append(element)
+        elif (tags.get("landuse") == "forest" or tags.get("natural") == "wood"):
+            canopy.append(element)
+        else:
+            centre = element.get("center") or {}
+            lat = element["lat"] if ("lat" in element) else centre.get("lat")
+            lon = element["lon"] if ("lon" in element) else centre.get("lon")
+
+            repere = landmarks.describe(tags, lat, lon)
+            if (repere is not None):
+                reperes.append(repere)
+
+    return network, canopy, reperes
+
+
+def fetch_everything(bbox, with_landmarks=True, log=print):
+    """The whole zone in a single round trip.
+
+    Asked separately, overpass walks the same box three times over and each ask waits
+    its own turn in the queue. Measured on a thirteen kilometre loop, the three came
+    to eleven minutes against under two seconds of actual computing"""
+    log("   reseau, couvert et reperes...")
+    box = _bbox(bbox)
+
+    body = ["[out:json][timeout:240];"]
+    body.append("(%s)->.net;" % _network_clause(box))
+    body.append("(%s)->.wood;" % _canopy_clause(box))
+    if (with_landmarks):
+        body.append("(%s)->.marks;" % _landmark_clause(box))
+
+    # one out per set, each in the shape its consumer needs. body geom for the massifs
+    # since a multipolygone has no geometry without its members
+    body.append(".net out geom tags;")
+    body.append(".wood out body geom;")
+    if (with_landmarks):
+        body.append(".marks out center tags;")
+
+    data = query("".join(body), log=log)
+    network, canopy, reperes = _sort_out(data["elements"])
+
+    log("   %d chemins, %d polygones, %d reperes"
+        % (len(network), len(canopy), len(reperes)))
+
+    return ({"elements": network}, {"elements": canopy}, reperes)
 
 
 def fetch_canopy(bbox, log=print):

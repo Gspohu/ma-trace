@@ -62,12 +62,15 @@ def _pick_source(bbox, source, log):
 
 def _gather(source, bbox, with_landmarks, log):
     """The network, the assembled canopy and the reperes, for the zone"""
-    network = source.fetch_network(bbox, log=log)
-    woods = source.fetch_canopy(bbox, log=log)
-
-    # free out of a local index, one more round trip through overpass. Whoever is in
-    # a hurry on the wire can turn it off
-    reperes = source.fetch_landmarks(bbox, log=log) if with_landmarks else []
+    # one ask for the three, which is what saves the minutes on a slow overpass. A
+    # source too old to know the call still answers the three separately
+    if (hasattr(source, "fetch_everything")):
+        network, woods, reperes = source.fetch_everything(
+            bbox, with_landmarks=with_landmarks, log=log)
+    else:
+        network = source.fetch_network(bbox, log=log)
+        woods = source.fetch_canopy(bbox, log=log)
+        reperes = source.fetch_landmarks(bbox, log=log) if with_landmarks else []
 
     canopy = Canopy(woods["elements"])
     kinds = ", ".join("%s %d" % (kind, count)

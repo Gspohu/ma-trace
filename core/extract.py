@@ -240,3 +240,10 @@ class LocalSource:
                 for repere in self._landmarks if landmarks.within(repere, bbox)]
         log("   %d reperes locaux" % len(kept))
         return kept
+
+    def fetch_everything(self, bbox, with_landmarks=True, log=print):
+        # the index sits in memoire already and the three passes cost nothing here
+        # This exists because overpass saves whole minutes by answering once
+        return (self.fetch_network(bbox, log=log),
+                self.fetch_canopy(bbox, log=log),
+                self.fetch_landmarks(bbox, log=log) if with_landmarks else [])

@@ -17,11 +17,13 @@ def haversine(a, b):
     return 2.0 * EARTH_R * math.asin(math.sqrt(h))
 
 
-def bbox_of(points, pad_metres=2500.0):
-    """Padded box around a list of (lat, lon).
+def bbox_of(points, pad_metres=1500.0):
+    """Padded box around a list of (lat, lon), the pad in metres and per axis.
 
-    The pad is given in metres and converted per axis. A fixed pad in degrees would
-    be noticeably tighter east to west than north to south at this latitude"""
+    The pad is what the router detours into, and every metre of it is surface overpass
+    has to walk. Measured on the trace itself : the hanau boucle holds down to 600 m
+    and changes at 300, the broceliande one holds to 1000. Fifteen hundred leaves both
+    untouched and halves what the old 2500 asked for"""
     lats = [p[0] for p in points]
     lons = [p[1] for p in points]
     if (not lats):

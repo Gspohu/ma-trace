@@ -157,3 +157,59 @@ def test_the_same_massif_with_its_members_does_cover():
     cover = Canopy(whole)
     assert cover.outer_count == 1
     assert cover.shape.area > 0.0
+
+
+def test_one_answer_is_sorted_back_into_three(monkeypatch):
+    """Overpass walks the box once and hands everything back mixed. The three filters
+    cannot select the same element, which is what makes sorting on tags safe"""
+    ring = [{"lat": 49.0, "lon": 7.5}, {"lat": 49.0, "lon": 7.6},
+            {"lat": 49.1, "lon": 7.6}, {"lat": 49.0, "lon": 7.5}]
+
+    mixed = {"elements": [
+        {"type": "way", "id": 1, "tags": {"highway": "path"}, "geometry": ring},
+        {"type": "way", "id": 2, "tags": {"landuse": "forest"}, "geometry": ring},
+        {"type": "relation", "id": 3, "tags": {"natural": "wood"},
+         "members": [{"role": "outer", "geometry": ring}]},
+        {"type": "node", "id": 4, "tags": {"historic": "castle", "name": "Falkenstein"},
+         "lat": 49.05, "lon": 7.55},
+        {"type": "way", "id": 5, "tags": {"building": "yes"}, "geometry": ring},
+    ]}
+
+    monkeypatch.setattr(overpass, "query", lambda body, log=print: mixed)
+
+    network, canopy, reperes = overpass.fetch_everything(BBOX, log=lambda _: None)
+
+    assert [e["id"] for e in network["elements"]] == [1]
+    assert [e["id"] for e in canopy["elements"]] == [2, 3]
+    assert [r["name"] for r in reperes] == ["Falkenstein"]
+
+
+def test_the_single_ask_carries_the_three_output_modes(monkeypatch):
+    seen = {}
+
+    def capture(body, log=print):
+        seen["body"] = body
+        return {"elements": []}
+
+    monkeypatch.setattr(overpass, "query", capture)
+    overpass.fetch_everything(BBOX, log=lambda _: None)
+
+    # a massif needs its members, a repere only its centre, a chemin its geometry
+    assert ".net out geom tags;" in seen["body"]
+    assert ".wood out body geom;" in seen["body"]
+    assert ".marks out center tags;" in seen["body"]
+
+
+def test_the_reperes_can_be_left_out_of_the_ask(monkeypatch):
+    seen = {}
+
+    def capture(body, log=print):
+        seen["body"] = body
+        return {"elements": []}
+
+    monkeypatch.setattr(overpass, "query", capture)
+    _, _, reperes = overpass.fetch_everything(BBOX, with_landmarks=False,
+                                              log=lambda _: None)
+
+    assert reperes == []
+    assert ".marks" not in seen["body"]
