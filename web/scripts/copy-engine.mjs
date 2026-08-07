@@ -36,6 +36,12 @@ const listed = await Promise.all(PACKAGES.map(async name =>
 
 const manifest = Object.fromEntries(listed);
 
+// the parcours live in data/ with the rest of the reference data, and are copied for
+// the same reason core/ is : one list, never two
+await copyFile(join(PROJECT, "data", "presets.json"),
+               resolve(HERE, "..", "src", "lib", "core", "presets.json"));
+console.log("  presets recopies depuis data/");
+
 // the worker reads this to know what to write into the virtual filesystem. A hand kept
 // list would rot the first time a module is added
 await writeFile(join(TARGET, "manifest.json"), JSON.stringify(manifest, null, 2));

@@ -19,12 +19,14 @@
       { "name": "Chateau de Waldeck", "lat": 49.01740, "lon": 7.52656 }
     ]
   },
-  "champ-du-feu": {
-    "label": "Le Hohwald, Champ du Feu, Neuntelstein",
+  "broceliande": {
+    "label": "Broceliande, tombeau de Merlin, Barenton et Comper (6 h 50)",
     "waypoints": [
-      { "name": "Le Hohwald", "lat": 48.40372, "lon": 7.31459 },
-      { "name": "Champ du Feu", "lat": 48.40122, "lon": 7.25397 },
-      { "name": "Rocher de Neuntelstein", "lat": 48.42869, "lon": 7.29218 }
+      { "name": "Tombeau de Merlin", "lat": 48.07799, "lon": -2.11774 },
+      { "name": "Fontaine de Jouvence", "lat": 48.07824, "lon": -2.11565 },
+      { "name": "Chateau de Comper", "lat": 48.07003, "lon": -2.17237 },
+      { "name": "Fontaine de Barenton", "lat": 48.03890, "lon": -2.24687 },
+      { "name": "Etang du Pas du Houx", "lat": 48.03808, "lon": -2.13801 }
     ]
   }
 }
