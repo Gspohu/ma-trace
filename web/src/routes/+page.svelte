@@ -30,7 +30,7 @@
 
     // the engine takes its time on the first trace, it has an interpreter to start and
     // a network to fetch. Saying where it is beats a spinner that could mean anything
-    let progress = $state<string | null>(null);
+    let progress = $state<string[]>([]);
 
 
     // an ojbect url is a resource, not a value. A plain $derived would mint a fresh one
@@ -96,13 +96,14 @@
         busy = true;
         failure = null;
         hovered = null;
+        progress = [];
 
 
         try
         {
             route = (await ask(payload, (stage, detail) =>
             {
-                progress = detail ?? stage;
+                progress = [...progress, detail ?? stage];
             })) as Route;
         }
         catch (cause)
@@ -131,6 +132,7 @@
             bind:paceFactor
             bind:maxSac
             {busy}
+            {progress}
             onsubmit={trace}
             onimport={importTrace}
         />
@@ -143,10 +145,6 @@
                 <MapLegend {route} bind:mode bind:showCanopy bind:showLandmarks />
             {/if}
 
-
-            {#if busy && progress}
-                <p class="progress">{progress}</p>
-            {/if}
 
             {#if failure}
                 <p class="failure">{failure}</p>
@@ -357,17 +355,6 @@
         border-radius: var(--radius-md);
         font-size: var(--font-size-sm);
         color: var(--colour-text-primary);
-    }
-
-    .progress
-    {
-        margin: 0;
-        padding: var(--spacing-base);
-        border-left: var(--border-width-thick) solid var(--colour-accent);
-        background: var(--colour-bg-surface-raised);
-        border-radius: var(--radius-md);
-        font-size: var(--font-size-sm);
-        color: var(--colour-text-secondary);
     }
 
     .missing

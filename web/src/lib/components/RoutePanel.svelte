@@ -1,4 +1,5 @@
 <script lang="ts">
+    import TraceProgress from "./TraceProgress.svelte";
     import { coordinate, decimal } from "$lib/core/format";
     import type { Preset, Waypoint } from "$lib/core/types";
 
@@ -12,6 +13,7 @@
         paceFactor: number;
         maxSac: number;
         busy: boolean;
+        progress: string[];
         onsubmit: () => void;
         onimport: (document: string) => void;
     }
@@ -27,6 +29,7 @@
         paceFactor = $bindable(),
         maxSac = $bindable(),
         busy,
+        progress,
         onsubmit,
         onimport
     }: Props = $props();
@@ -171,6 +174,12 @@
             Tracer la boucle
         {/if}
     </button>
+
+    <!-- right under the button, where the eye already is. Off in the other column it
+         went unseen on a phone, and a trace that says nothing reads as a hung one -->
+    {#if busy}
+        <TraceProgress notes={progress} />
+    {/if}
 
     <section>
         <h2>Analyser une trace</h2>
