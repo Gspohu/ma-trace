@@ -97,3 +97,13 @@ def wood_with_clearing():
         "tags": {"landuse": "forest"},
         "members": [members(outer, "outer"), members(inner, "inner")],
     }]
+
+
+@pytest.fixture(autouse=True)
+def _empty_memo():
+    # the overpass memo lives on the module, and a test serving another test's answer
+    # is how a suite starts lying about what it covers
+    from core import overpass
+    overpass.forget()
+    yield
+    overpass.forget()

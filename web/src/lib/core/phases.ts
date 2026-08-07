@@ -75,5 +75,10 @@ export function readable(note: string): string
         return "un serveur OpenStreetMap ne répond pas, on passe au suivant";
     }
 
+    if (/deja en memoire/i.test(clean))
+    {
+        return "zone déjà chargée, rien à redemander";
+    }
+
     return clean;
 }

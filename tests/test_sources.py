@@ -213,3 +213,64 @@ def test_the_reperes_can_be_left_out_of_the_ask(monkeypatch):
 
     assert reperes == []
     assert ".marks" not in seen["body"]
+
+
+def test_the_same_zone_is_not_asked_twice(monkeypatch):
+    """Nudging a curseur redraws over the very same box, and that ask is the whole
+    wait. The second one has to cost nothing"""
+    calls = {"count": 0}
+
+    def answer(url, data=None, timeout=0):
+        calls["count"] += 1
+        return _Answer({"elements": [{"type": "way", "id": 1}]})
+
+    overpass.forget()
+    monkeypatch.setattr(overpass._session, "post", answer)
+
+    first = overpass.query("bidon", log=lambda _: None)
+    second = overpass.query("bidon", log=lambda _: None)
+
+    assert calls["count"] == 1
+    assert first == second
+
+
+def test_another_zone_is_asked_for(monkeypatch):
+    calls = {"count": 0}
+
+    def answer(url, data=None, timeout=0):
+        calls["count"] += 1
+        return _Answer({"elements": []})
+
+    overpass.forget()
+    monkeypatch.setattr(overpass._session, "post", answer)
+
+    overpass.query("une zone", log=lambda _: None)
+    overpass.query("une autre", log=lambda _: None)
+
+    assert calls["count"] == 2
+
+
+def test_the_memo_never_grows_without_bound(monkeypatch):
+    """A phone has little to spare and one answer runs to several megabytes"""
+    overpass.forget()
+    monkeypatch.setattr(overpass._session, "post",
+                        lambda url, data=None, timeout=0: _Answer({"elements": []}))
+
+    for i in range(overpass.CACHE_DEPTH + 4):
+        overpass.query("zone %d" % i, log=lambda _: None)
+
+    assert len(overpass._answers) == overpass.CACHE_DEPTH
+
+
+def test_a_truncated_answer_is_never_kept(monkeypatch):
+    """It failed, and serving that failure again from memory would freeze the bug in"""
+    truncated = {"elements": [], "remark": "runtime error: Query timed out"}
+    overpass.forget()
+    monkeypatch.setattr(overpass._session, "post",
+                        lambda url, data=None, timeout=0: _Answer(truncated))
+    monkeypatch.setattr(overpass.time, "sleep", lambda seconds: None)
+
+    with pytest.raises(overpass.OverpassError):
+        overpass.query("bidon", tries=1, log=lambda _: None)
+
+    assert "bidon" not in overpass._answers

@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 """Overpass client with mirror failover, plus the queries the router needs"""
 
+import collections
 import os
 import time
 
@@ -41,8 +42,26 @@ class OverpassError(RuntimeError):
     pass
 
 
+# Answers already obtained, keyed on the query that got them. Nudging a curseur and
+# drawing again asks overpass for the very same zone, and that ask is the whole wait :
+# on a thirteen kilometre boucle, minutes against nothing. Kept small, one answer runs
+# to several megabytes and a phone has little to spare
+CACHE_DEPTH = 3
+_answers = collections.OrderedDict()
+
+
+def forget():
+    _answers.clear()
+
+
 def query(body, tries=3, timeout=240, log=print):
-    """Fire the same query at each mirror until one of them answers"""   
+    """Fire the same query at each mirror until one of them answers"""
+    known = _answers.get(body)
+    if (known is not None):
+        _answers.move_to_end(body)
+        log("   deja en memoire, rien a redemander")
+        return known
+
     last = "aucun miroir contacte"
 
     for attempt in range(tries):
@@ -70,6 +89,10 @@ def query(body, tries=3, timeout=240, log=print):
                     last = "%s : %s" % (url, remark)
                     log("   miroir indisponible : %s" % last)
                     continue
+
+                _answers[body] = data
+                while (len(_answers) > CACHE_DEPTH):
+                    _answers.popitem(last=False)
 
                 return data
 
